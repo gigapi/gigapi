@@ -18,10 +18,16 @@ type GigapiConfiguration struct {
 	NoMerges      bool    `json:"no_merges" mapstructure:"no_merges" default:"false"`
 }
 
+type BasicAuthConfiguration struct {
+	Username string `json:"username" mapstructure:"username" default:""`
+	Password string `json:"password" mapstructure:"password" default:""`
+}
+
 type Configuration struct {
-	Gigapi GigapiConfiguration `json:"gigapi" mapstructure:"gigapi" default:""`
-	Port   int                 `json:"port" mapstructure:"port" default:"7971"`
-	Host   string              `json:"host" mapstructure:"host" default:"0.0.0.0"`
+	Gigapi    GigapiConfiguration    `json:"gigapi" mapstructure:"gigapi" default:""`
+	Port      int                    `json:"port" mapstructure:"port" default:"7971"`
+	Host      string                 `json:"host" mapstructure:"host" default:"0.0.0.0"`
+	BasicAuth BasicAuthConfiguration `json:"basic_auth" mapstructure:"basic_auth" default:""`
 }
 
 var Config *Configuration
