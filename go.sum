@@ -34,6 +34,8 @@ github.com/fsnotify/fsnotify v1.7.0 h1:8JEhPFa5W2WU7YfeZzPNqzMP6Lwt7L2715Ggo0nos
 github.com/fsnotify/fsnotify v1.7.0/go.mod h1:40Bi/Hjc2AVfZrqy+aj+yEI+/bRxZnMJyTJwOpGvigM=
 github.com/gigapi/gigapi-querier v0.0.4 h1:LUP/+t4G+QrA9vdZr1xAFFyw1gGHNhmdjjM97QtRb9k=
 github.com/gigapi/gigapi-querier v0.0.4/go.mod h1:33oLYnKnCNfab4NJcCc2PDR8SJq1H5qTT2P9OfsSYBE=
+github.com/gigapi/gigapi-querier v0.0.5 h1:aIN7NqD39CzpqZk5ZBI+jMwbkhR8O1dyTsQ6D1oWIAc=
+github.com/gigapi/gigapi-querier v0.0.5/go.mod h1:33oLYnKnCNfab4NJcCc2PDR8SJq1H5qTT2P9OfsSYBE=
 github.com/go-faster/city v1.0.1 h1:4WAxSZ3V2Ws4QRDrscLEDcibJY8uf41H6AhXDrNDcGw=
 github.com/go-faster/city v1.0.1/go.mod h1:jKcUJId49qdW3L1qKHH/3wPeUstCVpVSXTM6vO3VcTw=
 github.com/go-faster/errors v0.6.1 h1:nNIPOBkprlKzkThvS/0YaX8Zs9KewLCOSFQS5BU06FI=
