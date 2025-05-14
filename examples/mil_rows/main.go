@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/gigapi/gigapi/v2/config"
+	"github.com/gigapi/gigapi-config/config"
 	"github.com/gigapi/gigapi/v2/merge"
 	"github.com/gigapi/gigapi/v2/merge/repository"
 	"github.com/gigapi/gigapi/v2/utils"

@@ -2,7 +2,7 @@ package router
 
 import (
 	"errors"
-	"github.com/gigapi/gigapi/v2/config"
+	"github.com/gigapi/gigapi-config/config"
 	"github.com/gigapi/gigapi/v2/modules"
 	"github.com/gigapi/gigapi/v2/utils"
 	"github.com/gorilla/mux"

@@ -1,7 +1,7 @@
 package merge
 
 import (
-	"github.com/gigapi/gigapi/v2/config"
+	"github.com/gigapi/gigapi-config/config"
 	"github.com/gigapi/gigapi/v2/merge/handlers"
 	"github.com/gigapi/gigapi/v2/merge/repository"
 	"github.com/gigapi/gigapi/v2/merge/utils"
@@ -11,6 +11,9 @@ import (
 )
 
 func Init(api modules.Api) {
+	if config.Config.Mode != "writeonly" && config.Config.Mode != "aio" {
+		return
+	}
 	err := os.MkdirAll(config.Config.Gigapi.Root, 0750)
 	if err != nil {
 		panic(err)
@@ -41,11 +44,6 @@ func Init(api modules.Api) {
 
 func InitHandlers(api modules.Api) {
 	handlers.API = api
-	api.RegisterRoute(&modules.Route{
-		Path:    "/gigapi/create",
-		Methods: []string{"POST"},
-		Handler: handlers.CreateTableHandler,
-	})
 	api.RegisterRoute(&modules.Route{
 		Path:    "/gigapi/insert",
 		Methods: []string{"POST"},
