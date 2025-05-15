@@ -4,7 +4,7 @@ go 1.24.2
 
 require (
 	github.com/apache/arrow/go/v14 v14.0.2
-	github.com/expr-lang/expr v1.17.2
+	github.com/expr-lang/expr v1.17.3
 	github.com/gigapi/gigapi-config v0.0.6
 	github.com/gigapi/gigapi-querier v0.0.6
 	github.com/go-faster/city v1.0.1
