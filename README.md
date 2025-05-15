@@ -125,6 +125,26 @@ $ curl -X POST "http://localhost:7972/query?db=mydb" \
 {"results":[{"avg(temperature)":87.025,"count_star()":"40"}]}
 ```
 
+#### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=24 /> FlightSQL
+GigAPI data can be accessed using FlightSQL GRPC clients in any language
+```python
+from flightsql import connect, FlightSQLClient
+client = FlightSQLClient(host='localhost',port=8082,insecure=True,metadata={'bucket':'hep'})
+conn = connect(client)
+cursor = conn.cursor()
+cursor.execute('SELECT 1, version()')
+print("rows:", [r for r in cursor])
+```
+
+#### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=24 /> UI
+A quick and dirty query user-interface is also provided for testing
+![image](https://github.com/user-attachments/assets/a9f09b3f-10fc-42e3-9092-770252e0d8d3)
+
+#### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=24 /> Grafana
+GigAPI can be used from Grafana using the InfluxDB3 Flight GRPC Datasource
+
+![image](https://github.com/user-attachments/assets/a7849ff4-b8f6-433b-8458-1c47394c5e5f)
+
 > GigAPI readers can be implemented in any language and with any OLAP engine supporting Parquet files.
 
 <br>
