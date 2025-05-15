@@ -8,19 +8,9 @@ services:
       - ./data:/data
     ports:
       - "7971:7971"
+      - "8082:8082"
     environment:
       - GIGAPI_ENABLED=true
       - GIGAPI_MERGE_TIMEOUT_S=10
       - GIGAPI_ROOT=/data
       - PORT=7971
-  gigapi-querier:
-    image: ghcr.io/gigapi/gigapi-querier:latest
-    container_name: gigapi-querier
-    hostname: gigapi-querier
-    volumes:
-      - ./data:/data
-    ports:
-      - "7972:7972"
-    environment:
-      - DATA_DIR=/data
-      - PORT=7972
