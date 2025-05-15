@@ -54,6 +54,7 @@ services:
 | `FLIGHTSQL_ENABLE`         | Enable FlightSQL server                                    | `true`          |
 | `LOGLEVEL`                 | Log level (debug, info, warn, error, fatal)                | `"info"`        |
 
+
 ## <img src="https://github.com/user-attachments/assets/74a1fa93-5e7e-476d-93cb-be565eca4a59" height=20 /> Write Support
 As write requests come in to GigAPI they are parsed and progressively appeanded to parquet files alongside their metadata. The ingestion buffer is flushed to disk at configurable intervals using a hive partitioning schema. Generated parquet files and their respective metadata are progressively compacted and sorted over time based on configuration parameters.
 
