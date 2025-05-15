@@ -13,7 +13,7 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/influxdata/influxdb v1.11.8
 	github.com/json-iterator/go v1.1.12
-	github.com/marcboeker/go-duckdb/v2 v2.2.0
+	github.com/marcboeker/go-duckdb/v2 v2.2.1
 	github.com/minio/minio-go/v7 v7.0.91
 	golang.org/x/exp v0.0.0-20250128182459-e0ece0dbea4c
 	golang.org/x/sync v0.13.0
