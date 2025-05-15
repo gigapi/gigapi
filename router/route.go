@@ -79,8 +79,8 @@ func RegisterRoute(r *modules.Route) {
 func NewRouter() *mux.Router {
 	router := mux.NewRouter()
 	middleware := &MiddlewareApply{}
-	if config.Config.BasicAuth.Username != "" {
-		middleware.withBasicAuth(config.Config.BasicAuth.Username, config.Config.BasicAuth.Password)
+	if config.Config.HTTP.BasicAuth.Username != "" {
+		middleware.withBasicAuth(config.Config.HTTP.BasicAuth.Username, config.Config.HTTP.BasicAuth.Password)
 	}
 	middleware.withErrorHandle()
 	for _, r := range handlerRegistry {

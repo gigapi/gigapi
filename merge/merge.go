@@ -11,7 +11,7 @@ import (
 )
 
 func Init(api modules.Api) {
-	if config.Config.Mode != "writeonly" && config.Config.Mode != "aio" {
+	if config.Config.Gigapi.Mode != "writeonly" && config.Config.Gigapi.Mode != "aio" {
 		return
 	}
 	err := os.MkdirAll(config.Config.Gigapi.Root, 0750)
