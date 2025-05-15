@@ -136,9 +136,11 @@ cursor.execute('SELECT 1, version()')
 print("rows:", [r for r in cursor])
 ```
 
-#### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=24 /> UI
-A quick and dirty query user-interface is also provided for testing
-![image](https://github.com/user-attachments/assets/a9f09b3f-10fc-42e3-9092-770252e0d8d3)
+#### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=24 /> GigAPI UI
+The embedded GigAPI UI can be used to explore and query data using SQL with advanced features
+
+![gigapi_preview](https://github.com/user-attachments/assets/8d550803-daa3-43dc-a4b3-b0779498fce5)
+
 
 #### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=24 /> Grafana
 GigAPI can be used from Grafana using the InfluxDB3 Flight GRPC Datasource
