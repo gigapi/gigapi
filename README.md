@@ -34,32 +34,25 @@ services:
     ports:
       - "7971:7971"
     environment:
-      - GIGAPI_ENABLED=true
-      - GIGAPI_MERGE_TIMEOUT_S=10
       - GIGAPI_ROOT=/data
-      - PORT=7971
-  gigapi-querier:
-    image: ghcr.io/gigapi/gigapi-querier:latest
-    container_name: gigapi-querier
-    hostname: gigapi-querier
-    volumes:
-      - ./data:/data
-    ports:
-      - "7972:7972"
-    environment:
-      - DATA_DIR=/data
-      - PORT=7972
 ```
 ### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=18 /> Settings
 
-| Env Var Name           | Description                                 | Default Value       |
-|------------------------|---------------------------------------------|---------------------|
-| GIGAPI_ROOT            | Root directory for the databases and tables | <current directory> |
-| GIGAPI_MERGE_TIMEOUT_S | Merge timeout in seconds                    | 10                  |
-| GIGAPI_SAVE_TIMEOUT_S  | Save timeout in seconds                     | 1.0                 |
-| GIGAPI_NO_MERGES       | Disables merges when set to true            | false               |
-| PORT                   | Port number for the server to listen on     | 7971                |
-
+| Env Var Name             | Description                                                | Default Value |
+|--------------------------|------------------------------------------------------------|---------------|
+| GIGAPI_ROOT              | Root folder for all the data files                         | ""            |
+| GIGAPI_MERGE_TIMEOUT_S   | Base timeout between merges (in seconds)                   | 10            |
+| GIGAPI_SAVE_TIMEOUT_S    | Timeout before saving the new data to the disk (in seconds)| 1             |
+| GIGAPI_NO_MERGES         | Disable merging                                            | false         |
+| GIGAPI_UI                | Enable UI for querier                                      | true          |
+| GIGAPI_MODE              | Execution mode (readonly, writeonly, compaction, aio)      | "aio"         |
+| HTTP_PORT                | Port to listen on for HTTP server                          | 7971          |
+| HTTP_HOST                | Host to bind to for HTTP server                            | "0.0.0.0"     |
+| HTTP_BASIC_AUTH_USERNAME | Username for HTTP basic authentication                     | ""            |
+| HTTP_BASIC_AUTH_PASSWORD | Password for HTTP basic authentication                     | ""            |
+| FLIGHTSQL_PORT           | Port to run FlightSQL server                               | 8082          |
+| FLIGHTSQL_ENABLE         | Enable FlightSQL server                                    | true          |
+| LOGLEVEL                 | Log level (debug, info, warn, error, fatal)                | "info"        |
 
 ## <img src="https://github.com/user-attachments/assets/74a1fa93-5e7e-476d-93cb-be565eca4a59" height=20 /> Write Support
 As write requests come in to GigAPI they are parsed and progressively appeanded to parquet files alongside their metadata. The ingestion buffer is flushed to disk at configurable intervals using a hive partitioning schema. Generated parquet files and their respective metadata are progressively compacted and sorted over time based on configuration parameters.
