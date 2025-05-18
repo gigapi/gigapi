@@ -1,3 +1,4 @@
+//go:generate go run build_ui.go
 package main
 
 import (
@@ -8,6 +9,7 @@ import (
 	"github.com/gigapi/gigapi/v2/modules"
 	"github.com/gigapi/gigapi/v2/router"
 	"github.com/gigapi/gigapi/v2/stdin"
+	"github.com/gigapi/gigapi/v2/ui"
 	"net/http"
 )
 
@@ -26,6 +28,7 @@ func initModules() {
 	stdin.Init()
 	merge.Init(&api{})
 	module.Init(&api{})
+	ui.Init(&api{})
 }
 
 func main() {
