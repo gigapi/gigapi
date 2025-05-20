@@ -15,6 +15,7 @@ require (
 	github.com/json-iterator/go v1.1.12
 	github.com/marcboeker/go-duckdb/v2 v2.2.1
 	github.com/minio/minio-go/v7 v7.0.91
+	github.com/redis/go-redis/v9 v9.8.0
 	github.com/spf13/afero v1.12.0
 	golang.org/x/exp v0.0.0-20250128182459-e0ece0dbea4c
 	golang.org/x/sync v0.14.0
@@ -25,6 +26,8 @@ require (
 	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/apache/arrow-go/v18 v18.1.0 // indirect
 	github.com/apache/thrift v0.21.0 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/duckdb/duckdb-go-bindings v0.1.14 // indirect
 	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.9 // indirect
 	github.com/duckdb/duckdb-go-bindings/darwin-arm64 v0.1.9 // indirect

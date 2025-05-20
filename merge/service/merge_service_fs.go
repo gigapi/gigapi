@@ -316,8 +316,8 @@ func (f *fsMergeService) merge(p PlanMerge) error {
 }
 
 func (f *fsMergeService) updateIndex(merge PlanMerge) error {
-	_min := make(map[string]any)
-	_max := make(map[string]any)
+	var minTime int64 = -1
+	var maxTime int64 = -1
 	var rowCount int64
 	toDelete := make([]string, len(merge.From))
 	for i, file := range merge.From {
@@ -328,11 +328,11 @@ func (f *fsMergeService) updateIndex(merge PlanMerge) error {
 		toDelete[i] = path
 		fromIdx := f.index.Get(path)
 		if i == 0 {
-			_min["__timestamp"] = fromIdx.Min["__timestamp"]
-			_max["__timestamp"] = fromIdx.Max["__timestamp"]
+			minTime = fromIdx.MinTime
+			maxTime = fromIdx.MaxTime
 		} else {
-			_min["__timestamp"] = min(_min["__timestamp"].(int64), fromIdx.Min["__timestamp"].(int64))
-			_max["__timestamp"] = max(_max["__timestamp"].(int64), fromIdx.Max["__timestamp"].(int64))
+			minTime = min(minTime, fromIdx.MinTime)
+			maxTime = max(maxTime, fromIdx.MaxTime)
 		}
 		rowCount += fromIdx.RowCount
 	}
@@ -349,8 +349,8 @@ func (f *fsMergeService) updateIndex(merge PlanMerge) error {
 		SizeBytes: stat.Size(),
 		RowCount:  rowCount,
 		ChunkTime: time.Now().UnixNano(),
-		Min:       _min,
-		Max:       _max,
+		MinTime:   minTime,
+		MaxTime:   maxTime,
 	}
 	prom := f.index.Batch([]*shared.IndexEntry{newIdx}, toDelete)
 	f.index.AddToDropQueue(merge.From)

@@ -138,11 +138,14 @@ func (p *Partition) Save() {
 		return
 	}
 
-	_min := make(map[string]any)
-	_max := make(map[string]any)
+	var minTime int64
+	var maxTime int64
 
-	if col, ok := unordered.store[p.table.OrderBy[0]]; ok {
-		_min[p.table.OrderBy[0]], _max[p.table.OrderBy[0]] = col.GetMinMax()
+	if col, ok := unordered.store["__timestamp"]; ok {
+		_minTime, _maxTime := col.GetMinMax()
+		if _, ok := _minTime.(int64); ok {
+			minTime, maxTime = _minTime.(int64), _maxTime.(int64)
+		}
 	}
 
 	if p.index != nil {
@@ -164,8 +167,8 @@ func (p *Partition) Save() {
 			SizeBytes: stat.Size(),
 			RowCount:  size,
 			ChunkTime: time.Now().UnixNano(),
-			Min:       _min,
-			Max:       _max,
+			MinTime:   minTime,
+			MaxTime:   maxTime,
 		}}, nil)
 		_, err = prom.Get()
 		if err != nil {
@@ -179,7 +182,7 @@ func (p *Partition) Save() {
 func (p *Partition) PlanMerge() ([]PlanMerge, error) {
 	var res []PlanMerge
 
-	configurations := getMergeConfigurations()
+	configurations := shared.GetMergeConfigurations()
 	for _, conf := range configurations {
 		if time.Now().Sub(p.lastIterationTime[conf[2]-1]).Seconds() > float64(conf[0]) {
 			files, err := p.mergeService.GetFilesToMerge(int(conf[2]))

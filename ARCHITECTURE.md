@@ -2994,7 +2994,7 @@ The merge planning process involves:
 ```go
 // Simplified version of the planning logic
 plans := []PlanMerge{}
-for _, config := range getMergeConfigurations() {
+for _, config := range GetMergeConfigurations() {
     if timeToMerge(config) {
         files := GetFilesToMerge(config.level)
         newPlans := PlanMerge(files, config.maxSize, config.level)

@@ -15,6 +15,7 @@ import (
 
 type jsonIndexEntry struct {
 	Id          uint32 `json:"id"`
+	Layer       string `json:"layer"`
 	Path        string `json:"path"`
 	SizeBytes   int64  `json:"size_bytes"`
 	RowCount    int64  `json:"row_count"`
@@ -204,23 +205,15 @@ func (J *JSONIndex) entry2JEntry(entries []*shared.IndexEntry) ([]*jsonIndexEntr
 	res := make([]*jsonIndexEntry, len(entries))
 	for i, entry := range entries {
 		id := atomic.AddUint32(&J.lastId, 1)
-		var (
-			minTime, maxTime int64
-		)
-		if _, ok := entry.Min["__timestamp"]; ok {
-			minTime = entry.Min["__timestamp"].(int64)
-		}
-		if _, ok := entry.Max["__timestamp"]; ok {
-			maxTime = entry.Max["__timestamp"].(int64)
-		}
 		_entry := &jsonIndexEntry{
 			Id:        id,
+			Layer:     entry.Layer,
 			Path:      entry.Path,
 			SizeBytes: entry.SizeBytes,
 			RowCount:  entry.RowCount,
 			ChunkTime: entry.ChunkTime,
-			MinTime:   minTime,
-			MaxTime:   maxTime,
+			MinTime:   entry.MinTime,
+			MaxTime:   entry.MaxTime,
 			Range:     "1h",
 			Type:      "compacted",
 		}
@@ -444,7 +437,7 @@ func (J *JSONIndex) Get(path string) *shared.IndexEntry {
 		SizeBytes: _e.SizeBytes,
 		RowCount:  _e.RowCount,
 		ChunkTime: _e.ChunkTime,
-		Min:       map[string]any{"__timestamp": _e.MinTime},
-		Max:       map[string]any{"__timestamp": _e.MaxTime},
+		MinTime:   _e.MinTime,
+		MaxTime:   _e.MaxTime,
 	}
 }
