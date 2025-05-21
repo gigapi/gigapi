@@ -1,30 +1,32 @@
-# 🌀 Deploy GigAPI on Fly.io _(for free)_
+![image](https://github.com/user-attachments/assets/0ca51072-1950-457c-81e6-109bba5ad6bb)
+
+# <img src="https://github.com/user-attachments/assets/74a1fa93-5e7e-476d-93cb-be565eca4a59" height=24 />  Deploy GigAPI on Fly.io _(for free)_
 
 This guide shows how to deploy GigAPI on Fly.io with persistent storage on free tier
 
 ### 🚀 Quickstart on Fly.io
 
-1. Clone the deployment gist
-```bash
-git clone https://gist.github.com/lmangani/fe9d9acbebf8b6b0b9645551160c2a20 gigapi-fly
-cd gigapi-fly
-```
-
-2. Install Fly.io CLI
+1. Install Fly.io CLI
 ```bash
 brew install flyctl         # or see https://fly.io/docs/hands-on/install-flyctl/
 fly auth signup             # or login if you already have an account
 ```
 
-3. Launch your app
+2. Install the GigAPI Fly template starter
+```bash
+mkdir gigapi-fly && cd gigapi-fly
+wget https://raw.githubusercontent.com/gigapi/gigapi/main/examples/fly.io/fly.toml
+```
+
+3. Configure your app for Launch
 ```bash
 fly launch
 ```
 
-* Choose a name for your instance
-* When prompted, accept the creation of a volume for persistent data
-* Decline Postgres or any other option — GigAPI does not need it
-* Shared IPs will work fine
+* Choose a `name` for your instance
+* When prompted, accept the creation of a `volume` for persistent data
+* Decline postgres, redis or any other option — GigAPI does not need it
+* Shared IPs will work just fine
 
 Once ready, deploy your 'GigAPI' instance:
 
