@@ -1,0 +1,46 @@
+volumes:
+  grafana_data: {}
+services:
+  gigapi:
+    image: ghcr.io/gigapi/gigapi:latest
+    container_name: gigapi
+    hostname: gigapi
+    restart: unless-stopped
+    volumes:
+      - ./data:/data
+    ports:
+      - "7971:7971"
+      - "8082:8082"
+    environment:
+      - GIGAPI_ROOT=/data
+
+  telegraf:
+    image: telegraf:latest
+    container_name: telegraf
+    network_mode: host
+    hostname: telegraf
+    restart: unless-stopped
+    volumes:
+      - ./telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc:/host/etc:ro
+    depends_on:
+      - gigapi
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - 3000:3000
+    environment:
+      - INFLUX_HOST=iox:8082
+      - INFLUX_TOKEN=${INFLUXDB_TOKEN}
+      - INFLUX_ORG=gigapi
+      - INFLUX_BUCKET=sensors
+      - GF_INSTALL_PLUGINS=influxdata-flightsql-datasource
+    volumes:
+      - ./flightsql.yml:/etc/grafana/provisioning/datasources/flightsql.yml
+      - grafana_data:/var/lib/grafana/
+    restart: always
+    depends_on:
+      - gigapi
