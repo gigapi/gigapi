@@ -55,7 +55,7 @@ func TestE2E(t *testing.T) {
 		Gigapi: config.GigapiConfiguration{
 			Root:          "_testdata",
 			MergeTimeoutS: 10,
-			Secret:        "XXXXXX",
+			Mode:          "aio",
 		},
 	}
 	merge.Init(&api{})
@@ -129,7 +129,6 @@ func TestMetadataFiles(t *testing.T) {
 		Gigapi: config.GigapiConfiguration{
 			Root:          "_testdata",
 			MergeTimeoutS: 10,
-			Secret:        "XXXXXX",
 		},
 	}
 	merge.Init(&api{})

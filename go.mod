@@ -2,6 +2,8 @@ module github.com/gigapi/gigapi/v2
 
 go 1.24.2
 
+replace github.com/gigapi/gigapi-querier v0.0.13 => ./deps/querier
+
 require (
 	github.com/apache/arrow/go/v14 v14.0.2
 	github.com/expr-lang/expr v1.17.2
