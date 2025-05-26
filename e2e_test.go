@@ -56,6 +56,10 @@ func TestE2E(t *testing.T) {
 			Root:          "_testdata",
 			MergeTimeoutS: 10,
 			Mode:          "aio",
+			Metadata: config.MetadataConfiguration{
+				Type: "redis",
+				URL:  "redis://localhost:6379/0",
+			},
 		},
 	}
 	merge.Init(&api{})

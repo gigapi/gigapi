@@ -1,32 +1,14 @@
 package shared
 
 import (
+	"github.com/gigapi/gigapi-config/config"
 	"github.com/gigapi/gigapi/v2/merge/data_types"
-	"github.com/gigapi/gigapi/v2/utils"
+	"github.com/gigapi/metadata"
 )
 
 type PartitionDesc struct {
 	Values   [][2]string
 	IndexMap []byte
-}
-
-type IndexEntry struct {
-	Path      string
-	SizeBytes int64
-	RowCount  int64
-	ChunkTime int64
-	Min       map[string]any
-	Max       map[string]any
-}
-
-type Index interface {
-	Batch(add []*IndexEntry, rm []string) utils.Promise[int32]
-	Get(path string) *IndexEntry
-	Run()
-	Stop()
-	AddToDropQueue(files []string) utils.Promise[int32]
-	RmFromDropQueue(files []string) utils.Promise[int32]
-	GetDropQueue() []string
 }
 
 type Table struct {
@@ -37,5 +19,15 @@ type Table struct {
 	OrderBy       []string
 	PartitionBy   func(map[string]data_types.IColumn) ([]PartitionDesc, error)
 	AutoTimestamp bool
-	IndexCreator  func(values [][2]string) (Index, error)
+	Index         metadata.TableIndex
+}
+
+func GetMergeConfigurations() [][3]int64 {
+	timeoutS := int64(config.Config.Gigapi.MergeTimeoutS)
+	return [][3]int64{
+		{timeoutS, 100 * 1024 * 1024, 1},
+		{timeoutS * 10, 400 * 1024 * 1024, 2},
+		{timeoutS * 100, 4000 * 1024 * 1024, 3},
+		{timeoutS * 420, 4000 * 1024 * 1024, 4},
+	}
 }

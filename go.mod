@@ -2,17 +2,22 @@ module github.com/gigapi/gigapi/v2
 
 go 1.24.2
 
+//replace (
+//	github.com/gigapi/gigapi-querier v0.0.15 => ./deps/querier
+//	github.com/gigapi/metadata v0.0.2 => ../metadata
+//)
+
 require (
 	github.com/apache/arrow/go/v14 v14.0.2
 	github.com/expr-lang/expr v1.17.2
-	github.com/gigapi/gigapi-config v0.0.6
+	github.com/gigapi/gigapi-config v0.0.7
 	github.com/gigapi/gigapi-querier v0.0.15
+	github.com/gigapi/metadata v0.0.2
 	github.com/go-faster/city v1.0.1
 	github.com/go-faster/jx v1.1.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/influxdata/influxdb v1.12.0
-	github.com/json-iterator/go v1.1.12
 	github.com/marcboeker/go-duckdb/v2 v2.2.0
 	github.com/minio/minio-go/v7 v7.0.91
 	github.com/spf13/afero v1.12.0
@@ -25,6 +30,8 @@ require (
 	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/apache/arrow-go/v18 v18.1.0 // indirect
 	github.com/apache/thrift v0.21.0 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/duckdb/duckdb-go-bindings v0.1.14 // indirect
 	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.9 // indirect
 	github.com/duckdb/duckdb-go-bindings/darwin-arm64 v0.1.9 // indirect
@@ -40,6 +47,7 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/flatbuffers v25.1.24+incompatible // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
+	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/asmfmt v1.3.2 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
@@ -55,6 +63,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pelletier/go-toml/v2 v2.1.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
+	github.com/redis/go-redis/v9 v9.8.0 // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect

@@ -12,8 +12,8 @@ import (
 	"github.com/gigapi/gigapi/v2/merge/data_types"
 	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/gigapi/gigapi/v2/utils"
+	"github.com/gigapi/metadata"
 	"github.com/go-faster/city"
-	"golang.org/x/sync/errgroup"
 	"io/fs"
 	"math"
 	"os"
@@ -144,6 +144,8 @@ type HiveMergeTreeService struct {
 
 	flushCtx context.Context
 	doFlush  context.CancelFunc
+
+	mergeService mergeService
 }
 
 func NewHiveMergeTreeService(t *shared.Table) (*HiveMergeTreeService, error) {
@@ -153,6 +155,16 @@ func NewHiveMergeTreeService(t *shared.Table) (*HiveMergeTreeService, error) {
 		},
 		partitions: make(map[uint64]*Partition),
 	}
+
+	dataPath := filepath.Join(config.Config.Gigapi.Root, t.Database, t.Name, "data")
+	tmpPath := filepath.Join(config.Config.Gigapi.Root, t.Database, t.Name, "tmp")
+	res.mergeService = &fsMergeService{
+		dataPath: dataPath,
+		tmpPath:  tmpPath,
+		table:    t,
+		index:    t.Index,
+	}
+
 	res.flushCtx, res.doFlush = context.WithTimeout(context.Background(), time.Second)
 	err := res.discoverPartitions()
 	if err != nil {
@@ -188,7 +200,7 @@ func (h *HiveMergeTreeService) discoverPartitions() error {
 			}
 		}
 
-		strPartitionPath := strings.TrimPrefix(p, h.Table.Path+string(filepath.Separator))
+		strPartitionPath := strings.TrimPrefix(p, filepath.Join(h.Table.Path, "data")+string(os.PathSeparator))
 		if !isLivePartition {
 			return filepath.SkipDir
 		}
@@ -206,7 +218,8 @@ func (h *HiveMergeTreeService) discoverPartitions() error {
 		if _, ok := h.partitions[id]; !ok {
 			h.partitions[id], err = NewPartition(values,
 				path.Join(h.Table.Path, "tmp"),
-				h.getDataPath(values),
+				path.Join(h.Table.Path, "data"),
+				h.getPartPath(values),
 				h.Table)
 			if err != nil {
 				return err
@@ -336,8 +349,8 @@ func (h *HiveMergeTreeService) calculatePartitionHash(values [][2]string) uint64
 	return city.CH64(unsafe.Slice((*byte)(unsafe.Pointer(&valuesHashes[0])), len(valuesHashes)*8))
 }
 
-func (h *HiveMergeTreeService) getDataPath(values [][2]string) string {
-	p := []string{h.Table.Path}
+func (h *HiveMergeTreeService) getPartPath(values [][2]string) string {
+	var p []string
 	for _, v := range values {
 		p = append(p, fmt.Sprintf("%s=%v", v[0], v[1]))
 	}
@@ -373,7 +386,8 @@ func (h *HiveMergeTreeService) Store(columns map[string]any) utils.Promise[int32
 		if _, ok := h.partitions[id]; !ok {
 			h.partitions[id], err = NewPartition(part.Values,
 				path.Join(h.Table.Path, "tmp"),
-				h.getDataPath(part.Values),
+				path.Join(h.Table.Path, "data"),
+				h.getPartPath(part.Values),
 				h.Table)
 			if err != nil {
 				h.mtx.Unlock()
@@ -400,36 +414,32 @@ func (h *HiveMergeTreeService) Store(columns map[string]any) utils.Promise[int32
 	return utils.NewWaitForAll(promises)
 }
 
-func (h *HiveMergeTreeService) PlanMerge() (map[uint64][]PlanMerge, error) {
-	mergeByPartition := make(map[uint64][]PlanMerge)
-	for id, part := range h.partitions {
-		plan, err := part.PlanMerge()
-		if err != nil {
-			return nil, err
+func (h *HiveMergeTreeService) PlanMerge() ([]metadata.MergePlan, error) {
+	configurations := getMergeConfigurations()
+	var res []metadata.MergePlan
+	for _, conf := range configurations {
+		if time.Now().Sub(h.lastIterationTime[conf[2]-1]).Seconds() > float64(conf[0]) {
+			//TODO: FIX IT
+			for i := 0; i < 5; i++ {
+				plan, err := h.Table.Index.GetMergePlanner().GetMergePlan("", int(conf[2]))
+				if err != nil {
+					return nil, err
+				}
+				if plan == nil {
+					break
+				}
+				res = append(res, *plan)
+			}
+			h.lastIterationTime[conf[2]-1] = time.Now()
 		}
-		mergeByPartition[id] = append(mergeByPartition[id], plan...)
 	}
-	return mergeByPartition, nil
+	return res, nil
 }
 
-func (h *HiveMergeTreeService) Merge(plan map[uint64][]PlanMerge) error {
-	errGroup := errgroup.Group{}
+func (h *HiveMergeTreeService) Merge(plan []metadata.MergePlan) error {
 	fmt.Println("Starting merges...")
 	start := time.Now()
-	for id, merges := range plan {
-		_id := id
-		_merges := merges
-		errGroup.Go(func() error {
-			if part, ok := h.partitions[_id]; ok {
-				err := part.DoMerge(_merges)
-				if err != nil {
-					return err
-				}
-			}
-			return nil
-		})
-	}
-	err := errGroup.Wait()
+	err := h.mergeService.DoMerge(plan)
 	fmt.Printf("Merge time: %v\n", time.Since(start))
 	return err
 }
@@ -496,28 +506,5 @@ func (m *MultithreadHiveMergeTreeService) Store(columns map[string]any) utils.Pr
 }
 
 func (m *MultithreadHiveMergeTreeService) DoMerge() error {
-	partitions := map[uint64]*Partition{}
-	for _, _m := range m.svcs {
-		for id, part := range _m.partitions {
-			partitions[id] = part
-		}
-	}
-
-	mergeByPartition := make(map[uint64][]PlanMerge)
-	for id, part := range partitions {
-		plan, err := part.PlanMerge()
-		if err != nil {
-			return err
-		}
-		mergeByPartition[id] = append(mergeByPartition[id], plan...)
-	}
-	wg := errgroup.Group{}
-	for k, p := range mergeByPartition {
-		_k := k
-		_p := p
-		wg.Go(func() error {
-			return partitions[_k].DoMerge(_p)
-		})
-	}
-	return wg.Wait()
+	return m.svcs[0].DoMerge()
 }
