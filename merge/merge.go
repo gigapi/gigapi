@@ -21,7 +21,7 @@ func Init(api modules.Api) {
 	if err != nil {
 		panic(err)
 	}
-	conn, cancel, err := utils.ConnectDuckDB("?allow_unsigned_extensions=1")
+	conn, cancel, err := utils.ConnectDuckDB("?access_mode=READ_WRITE&allow_unsigned_extensions=1")
 	if err != nil {
 		panic(err)
 	}

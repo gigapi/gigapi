@@ -145,7 +145,7 @@ func (f *fsMergeService) mergeFirstIteration(p metadata.MergePlan) error {
 
 	tmpFilePath := filepath.Join(f.tmpPath, filepath.Base(p.To))
 	finalFilePath := filepath.Join(f.dataPath, p.To)
-	conn, cancel, err := utils.ConnectDuckDB("?allow_unsigned_extensions=1")
+	conn, cancel, err := utils.ConnectDuckDB("?access_mode=READ_WRITE&allow_unsigned_extensions=1")
 	if err != nil {
 		return err
 	}
@@ -191,7 +191,7 @@ func (f *fsMergeService) cleanup(p metadata.MergePlan) {
 }
 
 func (f *fsMergeService) mergeMany(p metadata.MergePlan) error {
-	conn, cancel, err := utils.ConnectDuckDB("?allow_unsigned_extensions=1")
+	conn, cancel, err := utils.ConnectDuckDB("?access_mode=READ_WRITE&allow_unsigned_extensions=1")
 	if err != nil {
 		return err
 	}
