@@ -2,10 +2,10 @@ module github.com/gigapi/gigapi/v2
 
 go 1.24.2
 
-//replace (
-//	github.com/gigapi/gigapi-querier v0.0.15 => ./deps/querier
-//	github.com/gigapi/metadata v0.0.2 => ../metadata
-//)
+replace (
+	github.com/gigapi/gigapi-querier v0.0.15 => ./deps/querier
+	github.com/gigapi/metadata v0.0.2 => ../metadata
+)
 
 require (
 	github.com/apache/arrow/go/v14 v14.0.2
