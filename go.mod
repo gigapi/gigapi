@@ -15,7 +15,7 @@ require (
 	github.com/influxdata/influxdb v1.12.0
 	github.com/marcboeker/go-duckdb/v2 v2.2.0
 	github.com/minio/minio-go/v7 v7.0.91
-	github.com/spf13/afero v1.12.0
+	github.com/spf13/afero v1.14.0
 	golang.org/x/exp v0.0.0-20250128182459-e0ece0dbea4c
 	golang.org/x/sync v0.14.0
 )
