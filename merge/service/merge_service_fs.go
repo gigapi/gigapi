@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/gigapi/gigapi/v2/merge/utils"
-	"github.com/google/uuid"
+	"github.com/gigapi/metadata"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"html/template"
@@ -16,7 +16,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 )
@@ -27,82 +26,14 @@ var CHSQL_VER = "v1.0.10"
 const CHSQL_EXT_URL = "community"
 
 type mergeService interface {
-	GetFilesToMerge(iteration int) ([]FileDesc, error)
-	PlanMerge([]FileDesc, int64, int) []PlanMerge
-	DoMerge([]PlanMerge) error
+	DoMerge([]metadata.MergePlan) error
 }
 
 type fsMergeService struct {
 	dataPath string
 	tmpPath  string
 	table    *shared.Table
-	index    shared.Index
-}
-
-func (f *fsMergeService) GetFilesToMerge(iteration int) ([]FileDesc, error) {
-	dataDir := f.dataPath
-	files, err := os.ReadDir(dataDir)
-	if err != nil {
-		return nil, err
-	}
-	var parquetFiles []FileDesc
-	suffix := fmt.Sprintf("%d.parquet", iteration)
-	for _, file := range files {
-		if !strings.HasSuffix(file.Name(), suffix) {
-			continue
-		}
-		name := filepath.Join(dataDir, file.Name())
-		stat, err := os.Stat(name)
-		if err != nil {
-			return nil, err
-		}
-		if f.index != nil {
-			abs, err := filepath.Abs(name)
-			if err != nil {
-				return nil, err
-			}
-			entry := f.index.Get(abs)
-			if entry == nil {
-				continue
-			}
-		}
-
-		parquetFiles = append(parquetFiles, struct {
-			name string
-			size int64
-		}{name, stat.Size()})
-	}
-	sort.Slice(parquetFiles, func(a, b int) bool {
-		return parquetFiles[a].size > parquetFiles[b].size
-	})
-	return parquetFiles, nil
-}
-
-func (f *fsMergeService) PlanMerge(files []FileDesc, maxResSize int64, iteration int) []PlanMerge {
-	var res []PlanMerge
-	mergeSize := int64(0)
-	uid, _ := uuid.NewUUID()
-	_res := PlanMerge{
-		To:        path.Join(fmt.Sprintf("%s.%d.parquet", uid.String(), iteration+1)),
-		Iteration: iteration,
-	}
-	for _, file := range files {
-		mergeSize += file.size
-		_res.From = append(_res.From, file.name)
-		if mergeSize > maxResSize {
-			res = append(res, _res)
-			uid, _ := uuid.NewUUID()
-			_res = PlanMerge{
-				To:        path.Join(fmt.Sprintf("%s.%d.parquet", uid.String(), iteration+1)),
-				Iteration: iteration,
-			}
-			mergeSize = 0
-		}
-	}
-	if len(_res.From) > 0 {
-		res = append(res, _res)
-	}
-	return res
+	index    metadata.TableIndex
 }
 
 var tmpl = func() *template.Template {
@@ -201,10 +132,19 @@ func installChSql(db *sql.DB) error {
 // TODO: ADD configuration for this
 var firstIterationSemaphore = semaphore.NewWeighted(1)
 
-func (f *fsMergeService) mergeFirstIteration(p PlanMerge) error {
+func (f *fsMergeService) getAbsPaths(relPaths []string) []string {
+	from := make([]string, len(relPaths))
+	for i, p := range relPaths {
+		from[i] = filepath.Join(f.dataPath, p)
+	}
+	return from
+}
+
+func (f *fsMergeService) mergeFirstIteration(p metadata.MergePlan) error {
 	firstIterationSemaphore.Acquire(context.Background(), 1)
 	defer firstIterationSemaphore.Release(1)
-	tmpFilePath := filepath.Join(f.tmpPath, p.To)
+
+	tmpFilePath := filepath.Join(f.tmpPath, filepath.Base(p.To))
 	finalFilePath := filepath.Join(f.dataPath, p.To)
 	conn, cancel, err := utils.ConnectDuckDB("?access_mode=READ_WRITE&allow_unsigned_extensions=1")
 	if err != nil {
@@ -213,7 +153,7 @@ func (f *fsMergeService) mergeFirstIteration(p PlanMerge) error {
 	defer cancel()
 	createTableSQL := fmt.Sprintf(
 		`COPY(FROM read_parquet(ARRAY['%s'], hive_partitioning = false, union_by_name = true) ORDER BY %s)TO '%s' (FORMAT 'parquet')`,
-		strings.Join(p.From, "','"),
+		strings.Join(f.getAbsPaths(p.From), "','"),
 		strings.Join(f.table.OrderBy, " ASC,")+" ASC", tmpFilePath)
 	_, err = conn.Exec(createTableSQL)
 	if err != nil {
@@ -238,12 +178,12 @@ func (f *fsMergeService) mergeFirstIteration(p PlanMerge) error {
 	return nil
 }
 
-func (f *fsMergeService) cleanup(p PlanMerge) {
+func (f *fsMergeService) cleanup(p metadata.MergePlan) {
 	for _, file := range p.From {
 		_file := file
 		go func() {
 			<-time.After(time.Second * 30)
-			os.Remove(_file)
+			os.Remove(filepath.Join(f.dataPath, _file))
 			if f.index != nil {
 				f.index.RmFromDropQueue([]string{_file})
 			}
@@ -251,7 +191,7 @@ func (f *fsMergeService) cleanup(p PlanMerge) {
 	}
 }
 
-func (f *fsMergeService) mergeMany(p PlanMerge, tmpFilePath, finalFilePath string) error {
+func (f *fsMergeService) mergeMany(p metadata.MergePlan) error {
 	conn, cancel, err := utils.ConnectDuckDB("?access_mode=READ_WRITE&allow_unsigned_extensions=1")
 	if err != nil {
 		return err
@@ -262,10 +202,14 @@ func (f *fsMergeService) mergeMany(p PlanMerge, tmpFilePath, finalFilePath strin
 		return err
 	}
 
+	tmpFilePath := filepath.Join(f.tmpPath, filepath.Base(p.To))
+
 	createTableSQL := fmt.Sprintf(
 		`COPY(SELECT * FROM read_parquet_mergetree(ARRAY['%s'], '%s'))TO '%s' (FORMAT 'parquet')`,
-		strings.Join(p.From, "','"),
-		strings.Join(f.table.OrderBy, ","), tmpFilePath)
+		strings.Join(f.getAbsPaths(p.From), "','"),
+		strings.Join(f.table.OrderBy, ","),
+		tmpFilePath,
+	)
 	_, err = conn.Exec(createTableSQL)
 
 	if err != nil {
@@ -273,17 +217,15 @@ func (f *fsMergeService) mergeMany(p PlanMerge, tmpFilePath, finalFilePath strin
 		return err
 	}
 
-	err = os.Rename(tmpFilePath, finalFilePath)
+	err = os.Rename(tmpFilePath, p.To)
 	return err
 }
 
-func (f *fsMergeService) merge(p PlanMerge) error {
+func (f *fsMergeService) merge(p metadata.MergePlan) error {
 	if p.Iteration == 1 {
 		return f.mergeFirstIteration(p)
 	}
 
-	tmpFilePath := filepath.Join(f.tmpPath, p.To)
-	finalFilePath := filepath.Join(f.dataPath, p.To)
 	/*
 		fmt.Printf("Merging files:\n  Base path: %s\n", f.path)
 		for _, file := range p.From {
@@ -296,9 +238,9 @@ func (f *fsMergeService) merge(p PlanMerge) error {
 	var err error
 
 	if len(p.From) == 1 {
-		err = os.Rename(p.From[0], finalFilePath)
+		err = os.Rename(p.From[0], filepath.Join(f.dataPath, p.To))
 	} else {
-		err = f.mergeMany(p, tmpFilePath, finalFilePath)
+		err = f.mergeMany(p)
 	}
 	if err != nil {
 		return err
@@ -315,24 +257,26 @@ func (f *fsMergeService) merge(p PlanMerge) error {
 	return nil
 }
 
-func (f *fsMergeService) updateIndex(merge PlanMerge) error {
+func (f *fsMergeService) updateIndex(merge metadata.MergePlan) error {
 	_min := make(map[string]any)
 	_max := make(map[string]any)
+	var minTime int64
+	var maxTime int64
 	var rowCount int64
-	toDelete := make([]string, len(merge.From))
+	toDelete := make([]*metadata.IndexEntry, len(merge.From))
 	for i, file := range merge.From {
-		path, err := filepath.Abs(file)
-		if err != nil {
-			return err
+		toDelete[i] = &metadata.IndexEntry{
+			Database: f.table.Database,
+			Table:    f.table.Name,
+			Path:     file,
 		}
-		toDelete[i] = path
-		fromIdx := f.index.Get(path)
+		fromIdx := f.index.Get(file)
 		if i == 0 {
-			_min["__timestamp"] = fromIdx.Min["__timestamp"]
-			_max["__timestamp"] = fromIdx.Max["__timestamp"]
+			minTime = fromIdx.MinTime
+			maxTime = fromIdx.MaxTime
 		} else {
-			_min["__timestamp"] = min(_min["__timestamp"].(int64), fromIdx.Min["__timestamp"].(int64))
-			_max["__timestamp"] = max(_max["__timestamp"].(int64), fromIdx.Max["__timestamp"].(int64))
+			minTime = min(minTime, fromIdx.MinTime)
+			maxTime = max(maxTime, fromIdx.MaxTime)
 		}
 		rowCount += fromIdx.RowCount
 	}
@@ -344,21 +288,28 @@ func (f *fsMergeService) updateIndex(merge PlanMerge) error {
 	if err != nil {
 		return err
 	}
-	newIdx := &shared.IndexEntry{
-		Path:      path,
+	newIdx := &metadata.IndexEntry{
+		Path:      merge.To,
 		SizeBytes: stat.Size(),
 		RowCount:  rowCount,
 		ChunkTime: time.Now().UnixNano(),
 		Min:       _min,
 		Max:       _max,
+		MinTime:   minTime,
+		MaxTime:   maxTime,
+		Database:  f.table.Database,
+		Table:     f.table.Name,
 	}
-	prom := f.index.Batch([]*shared.IndexEntry{newIdx}, toDelete)
-	f.index.AddToDropQueue(merge.From)
+	prom := f.index.Batch([]*metadata.IndexEntry{newIdx}, toDelete)
 	_, err = prom.Get()
+	if err != nil {
+		return err
+	}
+	err = f.index.GetMergePlanner().EndMerge(&merge)
 	return err
 }
 
-func (f *fsMergeService) doMerge(merges []PlanMerge, merge func(p PlanMerge) error) error {
+func (f *fsMergeService) doMerge(merges []metadata.MergePlan, merge func(p metadata.MergePlan) error) error {
 	errGroup := errgroup.Group{}
 	sem := semaphore.NewWeighted(10)
 	for _, m := range merges {
@@ -373,8 +324,8 @@ func (f *fsMergeService) doMerge(merges []PlanMerge, merge func(p PlanMerge) err
 	return errGroup.Wait()
 }
 
-func (f *fsMergeService) DoMerge(merges []PlanMerge) error {
-	_merges := make([]PlanMerge, len(merges))
+func (f *fsMergeService) DoMerge(merges []metadata.MergePlan) error {
+	_merges := make([]metadata.MergePlan, len(merges))
 	copy(_merges, merges)
 	return f.doMerge(_merges, f.merge)
 }

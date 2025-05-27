@@ -7,6 +7,7 @@ import (
 	"github.com/gigapi/gigapi/v2/merge/data_types"
 	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/gigapi/gigapi/v2/utils"
+	"github.com/gigapi/metadata"
 	_ "github.com/marcboeker/go-duckdb/v2"
 	url2 "net/url"
 	"path"
@@ -323,7 +324,6 @@ type PlanMerge struct {
 	To        string
 	Iteration int
 }
-
 type FileDesc struct {
 	name string
 	size int64
@@ -334,35 +334,15 @@ const MERGE_ITERATIONS = 4
 // get merge configurations from the overall configuration
 // Each merge configuration is [3]int64 array {timeout in seconds, max result bytes, iteration id}
 func getMergeConfigurations() [][3]int64 {
-	timeoutS := int64(config.Config.Gigapi.MergeTimeoutS)
-	return [][3]int64{
-		{timeoutS, 100 * 1024 * 1024, 1},
-		{timeoutS * 10, 400 * 1024 * 1024, 2},
-		{timeoutS * 100, 4000 * 1024 * 1024, 3},
-		{timeoutS * 420, 4000 * 1024 * 1024, 4},
-	}
+	return shared.GetMergeConfigurations()
 }
 
-func (s *MergeTreeService) PlanMerge() ([]PlanMerge, error) {
-	var res []PlanMerge
-	// configuration - timeout_s - max_res_size_bytes - iteration_id
-	configurations := getMergeConfigurations()
-	for _, conf := range configurations {
-		if time.Now().Sub(s.lastIterationTime[conf[2]-1]).Seconds() > float64(conf[0]) {
-			files, err := s.merge.GetFilesToMerge(int(conf[2]))
-			if err != nil {
-				return nil, err
-			}
-			plans := s.merge.PlanMerge(files, conf[1], int(conf[2]))
-			res = append(res, plans...)
-			s.lastIterationTime[conf[2]-1] = time.Now()
-		}
-	}
-	return res, nil
+func (s *MergeTreeService) PlanMerge() ([]metadata.MergePlan, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
 // Merge method implementation
-func (s *MergeTreeService) Merge(plan []PlanMerge) error {
+func (s *MergeTreeService) Merge(plan []metadata.MergePlan) error {
 	return s.merge.DoMerge(plan)
 }
 
@@ -379,6 +359,6 @@ type MergeService interface {
 	Stop()
 	Store(columns map[string]any) utils.Promise[int32]
 	DoMerge() error
-	/*PlanMerge() ([]PlanMerge, error)
-	Merge(plan []PlanMerge) error*/
+	/*metadata.MergePlan() ([]metadata.MergePlan, error)
+	Merge(plan []metadata.MergePlan) error*/
 }

@@ -4,6 +4,7 @@ import (
 	"github.com/gigapi/gigapi/v2/merge/data_types"
 	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/gigapi/gigapi/v2/utils"
+	"github.com/gigapi/metadata"
 	"os"
 	"path/filepath"
 	"sync"
@@ -12,10 +13,9 @@ import (
 
 type Partition struct {
 	Values            [][2]string
-	index             shared.Index
+	index             metadata.TableIndex
 	unordered         *unorderedDataStore
 	saveService       saveService
-	mergeService      mergeService
 	promises          []utils.Promise[int32]
 	m                 sync.Mutex
 	table             *shared.Table
@@ -23,33 +23,21 @@ type Partition struct {
 	lastSave          time.Time
 	lastIterationTime [MERGE_ITERATIONS]time.Time
 	dataPath          string
+	partPath          string
 }
 
-func NewPartition(values [][2]string, tmpPath, dataPath string, t *shared.Table) (*Partition, error) {
+func NewPartition(values [][2]string, tmpPath, dataPath, partPath string, t *shared.Table) (*Partition, error) {
 	res := &Partition{
 		Values:    values,
 		unordered: newUnorderedDataStore(),
 		table:     t,
 		dataPath:  dataPath,
+		partPath:  partPath,
 	}
 	for i := range res.lastIterationTime {
 		res.lastIterationTime[i] = time.Now()
 	}
-	if t.IndexCreator != nil {
-		var err error
-		res.index, err = t.IndexCreator(values)
-		if err != nil {
-			return nil, err
-		}
-		dropQueue := res.index.GetDropQueue()
-		go func() {
-			time.Sleep(time.Second * 10)
-			for _, file := range dropQueue {
-				os.Remove(filepath.Join(res.dataPath, file))
-			}
-			res.index.RmFromDropQueue(dropQueue)
-		}()
-	}
+	res.index = t.Index
 	err := res.initServices(tmpPath, dataPath, t)
 	return res, err
 }
@@ -59,7 +47,7 @@ func (p *Partition) initServices(tmpPath, dataPath string, t *shared.Table) erro
 	if err != nil {
 		return err
 	}
-	err = os.MkdirAll(dataPath, 0755)
+	err = os.MkdirAll(filepath.Join(dataPath, p.partPath), 0755)
 	if err != nil {
 		return err
 	}
@@ -67,12 +55,7 @@ func (p *Partition) initServices(tmpPath, dataPath string, t *shared.Table) erro
 	p.saveService = &fsSaveService{
 		dataPath: dataPath,
 		tmpPath:  tmpPath,
-	}
-	p.mergeService = &fsMergeService{
-		dataPath: dataPath,
-		tmpPath:  tmpPath,
-		table:    t,
-		index:    p.index,
+		partPath: p.partPath,
 	}
 	return nil
 }
@@ -138,19 +121,14 @@ func (p *Partition) Save() {
 		return
 	}
 
-	_min := make(map[string]any)
-	_max := make(map[string]any)
+	var minTime, maxTime any
 
 	if col, ok := unordered.store[p.table.OrderBy[0]]; ok {
-		_min[p.table.OrderBy[0]], _max[p.table.OrderBy[0]] = col.GetMinMax()
+		minTime, maxTime = col.GetMinMax()
 	}
 
 	if p.index != nil {
-		absDataPath, err := filepath.Abs(fName)
-		if err != nil {
-			onErr(err)
-			return
-		}
+		absDataPath := filepath.Join(p.dataPath, fName)
 		stat, err := os.Stat(absDataPath)
 		if err != nil {
 			onErr(err)
@@ -159,13 +137,17 @@ func (p *Partition) Save() {
 
 		size := unordered.GetSize()
 
-		prom := p.index.Batch([]*shared.IndexEntry{{
-			Path:      absDataPath,
+		prom := p.index.Batch([]*metadata.IndexEntry{{
+			Database:  p.table.Database,
+			Table:     p.table.Name,
+			Path:      fName,
 			SizeBytes: stat.Size(),
 			RowCount:  size,
 			ChunkTime: time.Now().UnixNano(),
-			Min:       _min,
-			Max:       _max,
+			Min:       nil,
+			Max:       nil,
+			MinTime:   minTime.(int64),
+			MaxTime:   maxTime.(int64),
 		}}, nil)
 		_, err = prom.Get()
 		if err != nil {
@@ -174,26 +156,4 @@ func (p *Partition) Save() {
 		}
 	}
 	onErr(nil)
-}
-
-func (p *Partition) PlanMerge() ([]PlanMerge, error) {
-	var res []PlanMerge
-
-	configurations := getMergeConfigurations()
-	for _, conf := range configurations {
-		if time.Now().Sub(p.lastIterationTime[conf[2]-1]).Seconds() > float64(conf[0]) {
-			files, err := p.mergeService.GetFilesToMerge(int(conf[2]))
-			if err != nil {
-				return nil, err
-			}
-			plans := p.mergeService.PlanMerge(files, conf[1], int(conf[2]))
-			res = append(res, plans...)
-			p.lastIterationTime[conf[2]-1] = time.Now()
-		}
-	}
-	return res, nil
-}
-
-func (p *Partition) DoMerge(plan []PlanMerge) error {
-	return p.mergeService.DoMerge(plan)
 }

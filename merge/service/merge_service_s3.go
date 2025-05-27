@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/gigapi/gigapi/v2/merge/utils"
+	"github.com/gigapi/metadata"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"golang.org/x/sync/errgroup"
@@ -62,15 +63,11 @@ func (s *s3MergeService) GetFilesToMerge(iteration int) ([]FileDesc, error) {
 	return res, nil
 }
 
-func (s *s3MergeService) PlanMerge(descs []FileDesc, maxSize int64, iteration int) []PlanMerge {
-	return s.fsMergeService.PlanMerge(descs, maxSize, iteration)
-}
-
 func escapeString(s string) string {
 	return strings.Replace(s, "'", "''", -1)
 }
 
-func (s *s3MergeService) merge(p PlanMerge) error {
+func (s *s3MergeService) merge(p metadata.MergePlan) error {
 	// Create a temporary merged file
 	tmpFilePath := filepath.Join(s.tmpPath, p.To)
 
@@ -143,6 +140,6 @@ func (s *s3MergeService) merge(p PlanMerge) error {
 	return eg.Wait()
 }
 
-func (s *s3MergeService) DoMerge(merges []PlanMerge) error {
+func (s *s3MergeService) DoMerge(merges []metadata.MergePlan) error {
 	return s.doMerge(merges, s.merge)
 }

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"github.com/apache/arrow/go/v14/arrow"
 	"github.com/apache/arrow/go/v14/arrow/array"
 	"github.com/apache/arrow/go/v14/arrow/memory"
@@ -10,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"os"
 	"path"
+	"path/filepath"
 )
 
 type fieldDesc [2]string
@@ -25,6 +27,7 @@ type saveService interface {
 type fsSaveService struct {
 	dataPath    string
 	tmpPath     string
+	partPath    string
 	recordBatch *array.RecordBuilder
 	schema      *arrow.Schema
 }
@@ -98,8 +101,13 @@ func (fs *fsSaveService) Save(fields []fieldDesc, unorderedData dataStore) (stri
 	if err != nil {
 		return "", err
 	}
+	var relPath []string
+	if fs.partPath != "" {
+		relPath = append(relPath, fs.partPath)
+	}
+	relPath = append(relPath, filename.String()+".1.parquet")
 	tmpFileName := path.Join(fs.tmpPath, filename.String()+".1.parquet")
-	fileName := path.Join(fs.dataPath, filename.String()+".1"+".parquet")
+	absPath := append([]string{fs.dataPath}, relPath...)
 	/*
 		fmt.Printf("Saving file:\n  FileSave path: %s\n  tmp path: %s\n  data path:  %s\n",
 			fs.path, tmpFileName, fileName)
@@ -109,5 +117,9 @@ func (fs *fsSaveService) Save(fields []fieldDesc, unorderedData dataStore) (stri
 	if err != nil {
 		return "", err
 	}
-	return fileName, os.Rename(tmpFileName, fileName)
+	err = os.Rename(tmpFileName, filepath.Join(absPath...))
+	if err != nil {
+		err = fmt.Errorf("REN1: %v", err)
+	}
+	return filepath.Join(relPath...), err
 }

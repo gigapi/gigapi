@@ -4,8 +4,10 @@ import (
 	"github.com/gigapi/gigapi-config/config"
 	"github.com/gigapi/gigapi/v2/merge/handlers"
 	"github.com/gigapi/gigapi/v2/merge/repository"
+	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/gigapi/gigapi/v2/merge/utils"
 	"github.com/gigapi/gigapi/v2/modules"
+	"github.com/gigapi/metadata"
 	"net/http"
 	"os"
 )
@@ -14,6 +16,7 @@ func Init(api modules.Api) {
 	if config.Config.Gigapi.Mode != "writeonly" && config.Config.Gigapi.Mode != "aio" {
 		return
 	}
+	metadata.MergeConfigurations = shared.GetMergeConfigurations()
 	err := os.MkdirAll(config.Config.Gigapi.Root, 0750)
 	if err != nil {
 		panic(err)

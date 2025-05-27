@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"github.com/gigapi/gigapi-config/config"
 	"github.com/gigapi/gigapi/v2/merge/data_types"
-	"github.com/gigapi/gigapi/v2/merge/index"
 	"github.com/gigapi/gigapi/v2/merge/service"
 	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/gigapi/gigapi/v2/utils"
+	"github.com/gigapi/metadata"
 	"os"
 	"path"
 	"path/filepath"
@@ -84,9 +84,26 @@ func Store(db string, name string, columns map[string]any) utils.Promise[int32] 
 	return table.Store(columns)
 }
 
+func getTableIndex(table *shared.Table) (metadata.TableIndex, error) {
+	switch config.Config.Gigapi.Metadata.Type {
+	case "json":
+		return metadata.NewJSONIndex(config.Config.Gigapi.Root, table.Database, table.Name), nil
+	case "redis":
+		return metadata.NewRedisIndex(config.Config.Gigapi.Metadata.URL, table.Database, table.Name)
+	}
+	return nil, fmt.Errorf("unknown metadata type: %q", config.Config.Gigapi.Metadata.Type)
+}
+
 func RegisterSimpleTable(db, name string) error {
 	if db == "" {
 		db = "default"
+	}
+	idx, err := getTableIndex(&shared.Table{
+		Database: db,
+		Name:     name,
+	})
+	if err != nil {
+		return err
 	}
 	table := &shared.Table{
 		Database: db,
@@ -132,27 +149,7 @@ func RegisterSimpleTable(db, name string) error {
 
 		},
 		AutoTimestamp: true,
-	}
-	m := sync.Mutex{}
-	parts := make(map[string]shared.Index)
-	table.IndexCreator = func(values [][2]string) (shared.Index, error) {
-		m.Lock()
-		defer m.Unlock()
-		idxName := make([]string, len(values))
-		for i, v := range values {
-			idxName[i] = fmt.Sprintf("%s=%s", v[0], v[1])
-		}
-		idx, ok := parts[path.Join(idxName...)]
-		if !ok {
-			idx, err := index.NewJSONIndexForPartition(table, values)
-			if err != nil {
-				return nil, err
-			}
-			parts[path.Join(idxName...)] = idx
-			idx.Run()
-			return idx, nil
-		}
-		return idx, nil
+		Index:         idx,
 	}
 	return RegisterNewTable(table)
 }
