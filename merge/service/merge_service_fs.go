@@ -8,6 +8,7 @@ import (
 	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/gigapi/gigapi/v2/merge/utils"
 	"github.com/gigapi/metadata"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"html/template"
 	"io"
@@ -308,7 +309,7 @@ func (f *fsMergeService) updateIndex(merge metadata.MergePlan) error {
 	return err
 }
 
-/*func (f *fsMergeService) doMerge(merges []metadata.MergePlan, merge func(p metadata.MergePlan) error) error {
+func (f *fsMergeService) doMerge(merges []metadata.MergePlan, merge func(p metadata.MergePlan) error) error {
 	errGroup := errgroup.Group{}
 	sem := semaphore.NewWeighted(10)
 	for _, m := range merges {
@@ -321,18 +322,6 @@ func (f *fsMergeService) updateIndex(merge metadata.MergePlan) error {
 		})
 	}
 	return errGroup.Wait()
-}*/
-
-func (f *fsMergeService) doMerge(merges []metadata.MergePlan, merge func(p metadata.MergePlan) error) error {
-	for _, m := range merges {
-		_m := m
-		err := merge(_m)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-
 }
 
 func (f *fsMergeService) DoMerge(merges []metadata.MergePlan) error {
