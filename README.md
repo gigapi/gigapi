@@ -205,3 +205,5 @@ GigAPI can be used from Grafana using the InfluxDB3 Flight GRPC Datasource
 [^2]: ClickHouse ® is a trademark of ClickHouse Inc. No direct affiliation or endorsement. [^2]
 [^3]: InfluxDB ® is a trademark of InfluxData. No direct affiliation or endorsement. [^3]
 [^4]: Released under the MIT license. See LICENSE for details. All rights reserved by their respective owners. [^4]
+
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/gigapi/gigapi)
