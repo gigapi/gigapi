@@ -190,6 +190,10 @@ GigAPI can be used from Grafana using the InfluxDB3 Flight GRPC Datasource
 
 ```
 
+### Got Questions?
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/gigapi/gigapi)
+
+
 ### Contributors
 
 &nbsp;&nbsp;&nbsp;&nbsp;[![Contributors @metrico/quackpipe](https://contrib.rocks/image?repo=gigapi/gigapi)](https://github.com/gigapi/gigapi/graphs/contributors)
@@ -198,7 +202,6 @@ GigAPI can be used from Grafana using the InfluxDB3 Flight GRPC Datasource
 
 [![Stargazers for @metrico/quackpipe](https://reporoster.com/stars/gigapi/gigapi)](https://github.com/gigapi/gigapi/stargazers)
 
-
 ###### :black_joker: Disclaimers 
 
 [^1]: DuckDB ® is a trademark of DuckDB Foundation. All rights reserved by their respective owners. [^1]
@@ -206,4 +209,3 @@ GigAPI can be used from Grafana using the InfluxDB3 Flight GRPC Datasource
 [^3]: InfluxDB ® is a trademark of InfluxData. No direct affiliation or endorsement. [^3]
 [^4]: Released under the MIT license. See LICENSE for details. All rights reserved by their respective owners. [^4]
 
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/gigapi/gigapi)
