@@ -37,9 +37,8 @@ jobs:
         mkdir -p ./data
         go test -v ./...
       env:
+        GIGAPI_ROOT: ./data
         GIGAPI_ENABLED: true
         GIGAPI_MERGE_TIMEOUT_S: 10
-        GIGAPI_METADATA_TYPE: redis
-        GIGAPI_METADATA_URL: redis://localhost:6379/0 
-        GIGAPI_ROOT: ./data
-        PORT: 7971
+#        GIGAPI_METADATA_TYPE: redis
+#        GIGAPI_METADATA_URL: redis://localhost:6379/0 
