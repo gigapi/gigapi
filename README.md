@@ -55,6 +55,24 @@ services:
 | `LOGLEVEL`                 | Log level (debug, info, warn, error, fatal)                | `"info"`        |
 
 
+# DuckDB Baseline Settings
+
+The following environment variables can be used to control baseline DuckDB resource usage for both writer and querier deployments:
+
+| Variable              | Description                        | Default |
+|-----------------------|------------------------------------|---------|
+| DUCKDB_MEM_LIMIT      | DuckDB memory limit (e.g. 1GB)     | 1GB     |
+| DUCKDB_THREAD_LIMIT   | DuckDB thread limit (int)           | 1       |
+
+These are applied automatically to every DuckDB connection:
+
+```sql
+SET memory_limit='{DUCKDB_MEM_LIMIT}'
+SET threads TO {DUCKDB_THREAD_LIMIT}
+```
+
+You can override the defaults by setting these environment variables before starting the service.
+
 ## <img src="https://github.com/user-attachments/assets/74a1fa93-5e7e-476d-93cb-be565eca4a59" height=20 /> Write Support
 As write requests come in to GigAPI they are parsed and progressively appeanded to parquet files alongside their metadata. The ingestion buffer is flushed to disk at configurable intervals using a hive partitioning schema. Generated parquet files and their respective metadata are progressively compacted and sorted over time based on configuration parameters.
 

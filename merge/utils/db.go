@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/marcboeker/go-duckdb/v2" // load duckdb driver
+	"os"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,6 +20,27 @@ type dbWrapper struct {
 
 var dbHeld int32
 var poolSize int32
+
+const (
+	DEFAULT_MEM_LIMIT      = "1GB"
+	DEFAULT_DB_THREAD_LIMIT = 1
+)
+
+func getDuckDBMemLimit() string {
+	if v := os.Getenv("DUCKDB_MEM_LIMIT"); v != "" {
+		return v
+	}
+	return DEFAULT_MEM_LIMIT
+}
+
+func getDuckDBThreadLimit() int {
+	if v := os.Getenv("DUCKDB_THREAD_LIMIT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return DEFAULT_DB_THREAD_LIMIT
+}
 
 /*func init() {
 	t := time.NewTicker(time.Second * 30)
@@ -51,6 +74,9 @@ func ConnectDuckDB(filePath string) (*sql.DB, func(), error) {
 	if db != nil {
 		atomic.AddInt32(&poolSize, -1)
 		atomic.AddInt32(&dbHeld, 1)
+		// Set baseline DuckDB settings
+		_, _ = db.(*dbWrapper).Exec("SET memory_limit='" + getDuckDBMemLimit() + "'")
+		_, _ = db.(*dbWrapper).Exec(fmt.Sprintf("SET threads TO %d", getDuckDBThreadLimit()))
 		return db.(*dbWrapper).DB, cancel, nil
 	}
 	db, err := sql.Open("duckdb", filePath)
@@ -63,6 +89,9 @@ func ConnectDuckDB(filePath string) (*sql.DB, func(), error) {
 		db.(*dbWrapper).Close()
 		return nil, nil, fmt.Errorf("failed to connect to DuckDB: %w", err)
 	}
+	// Set baseline DuckDB settings
+	_, _ = db.(*dbWrapper).Exec("SET memory_limit='" + getDuckDBMemLimit() + "'")
+	_, _ = db.(*dbWrapper).Exec(fmt.Sprintf("SET threads TO %d", getDuckDBThreadLimit()))
 	atomic.AddInt32(&dbHeld, 1)
 	return db.(*dbWrapper).DB, cancel, nil
 }
