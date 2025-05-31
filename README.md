@@ -45,31 +45,18 @@ services:
 | `GIGAPI_SAVE_TIMEOUT_S`    | Timeout before saving the new data to the disk (in seconds)| `1`             |
 | `GIGAPI_NO_MERGES`         | Disable merging                                            | `false`         |
 | `GIGAPI_UI`                | Enable UI for querier                                      | `true`          |
-| `GIGAPI_MODE`              | Execution mode (readonly, writeonly, compaction, aio)      | `"aio"`         |
-| `HTTP_PORT`                | Port to listen on for HTTP server                          | `7971`          |
-| `HTTP_HOST`                | Host to bind to for HTTP server                            | `"0.0.0.0"`     |
-| `HTTP_BASIC_AUTH_USERNAME` | Username for HTTP basic authentication                     |               |
-| `HTTP_BASIC_AUTH_PASSWORD` | Password for HTTP basic authentication                     |               |
-| `FLIGHTSQL_PORT`           | Port to run FlightSQL server                               | `8082`          |
-| `FLIGHTSQL_ENABLE`         | Enable FlightSQL server                                    | `true`          |
-| `LOGLEVEL`                 | Log level (debug, info, warn, error, fatal)                | `"info"`        |
-
-
-# DuckDB Baseline Settings
-
-The following environment variables can be used to control baseline DuckDB resource usage for both writer and querier deployments:
-
-| Variable              | Description                        | Default |
-|-----------------------|------------------------------------|---------|
-| DUCKDB_MEM_LIMIT      | DuckDB memory limit (e.g. 1GB)     | 1GB     |
-| DUCKDB_THREAD_LIMIT   | DuckDB thread limit (int)           | 1       |
-
-These are applied automatically to every DuckDB connection:
-
-```sql
-SET memory_limit='{DUCKDB_MEM_LIMIT}'
-SET threads TO {DUCKDB_THREAD_LIMIT}
-```
+| `GIGAPI_MODE`              | Execution mode (`readonly`, `writeonly`, `compaction`, `aio`) | `"aio"`      |
+| `GIGAPI_METADATA_TYPE`     | Metadata Type (`json` for local, `redis` for distributed)  | `"json"`    |
+| `GIGAPI_METADATA_URL`      | Metadata Type URL for redis (ie: `redis://redis:6379/0`    |             |
+| `HTTP_PORT`                | Port to listen on for HTTP server                          | `7971`      |
+| `HTTP_HOST`                | Host to bind to for HTTP server                            | `"0.0.0.0"` |
+| `HTTP_BASIC_AUTH_USERNAME` | Username for HTTP basic authentication                     |             |
+| `HTTP_BASIC_AUTH_PASSWORD` | Password for HTTP basic authentication                     |             |
+| `FLIGHTSQL_PORT`           | Port to run FlightSQL server                               | `8082`      |
+| `FLIGHTSQL_ENABLE`         | Enable FlightSQL server                                    | `true`      |
+| `LOGLEVEL`                 | Log level (debug, info, warn, error, fatal)                | `"info"`    |
+| `DUCKDB_MEM_LIMIT`         | DuckDB memory limit (e.g. 1GB)                             | `"1GB"`     |
+| `DUCKDB_THREAD_LIMIT`      | DuckDB thread limit (int)                                  | `1`         |
 
 You can override the defaults by setting these environment variables before starting the service.
 
