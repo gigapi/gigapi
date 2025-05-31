@@ -14,9 +14,9 @@ Like a durable parquet floor, GigAPI provides rock-solid data foundation for you
 
 * Fast: DuckDB SQL + Parquet powered OLAP API Engine
 * Flexible: Schema-less Parquet Ingestion & Compaction
-* Simple: Low Maintenance, Portable, Infinitely Scalable
+* Simple: Low Maintenance, Portable Catalog, Infinitely Scalable
 * Smart: Independent storage/write and compute/read components
-* Extensible: Built-In Query Engine _(DuckDB)_ or DIY _(ClickHouse, Datafusion, etc)_
+* Extensible: Built-In Query Engine _(DuckDB)_ or BYODB _(ClickHouse, Datafusion, etc)_
 
 ## <img src="https://github.com/user-attachments/assets/74a1fa93-5e7e-476d-93cb-be565eca4a59" height=20 /> Usage
 
