@@ -20,8 +20,7 @@ Like a durable parquet floor, GigAPI provides rock-solid data foundation for you
 
 ## <img src="https://github.com/user-attachments/assets/74a1fa93-5e7e-476d-93cb-be565eca4a59" height=20 /> Usage
 
-> S3 Support Coming Soon
-
+> For more usage samples see the [examples](/examples) directory
 ```yml
 services:
   gigapi:
