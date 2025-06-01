@@ -64,7 +64,9 @@ services:
 | `DUCKDB_MEM_LIMIT`         | DuckDB memory limit (e.g. 1GB)                             | `"1GB"`     |
 | `DUCKDB_THREAD_LIMIT`      | DuckDB thread limit (int)                                  | `1`         |
 
-You can override the defaults by setting these environment variables before starting the service.
+> You can override the defaults by setting these environment variables before starting the service.
+
+<br>
 
 ## <img src="https://github.com/user-attachments/assets/74a1fa93-5e7e-476d-93cb-be565eca4a59" height=20 /> Write Support
 As write requests come in to GigAPI they are parsed and progressively appeanded to parquet files alongside their metadata. The ingestion buffer is flushed to disk at configurable intervals using a hive partitioning schema. Generated parquet files and their respective metadata are progressively compacted and sorted over time based on configuration parameters.
@@ -80,8 +82,10 @@ weather,location=us-west,season=summer temperature=99
 EOF
 ```
 
+### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=18 /> FlightSQL
+
 > [!NOTE]
-> _more ingestion protocols coming soon!_
+> _FlightSQL ingestion is coming soon!_
 
 ### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=18 /> Data Schema
 GigAPI is a schema-on-write database managing databases, tables and schemas on the fly. New columns can be added or removed over time, leaving reconciliation up to readers.
@@ -144,7 +148,7 @@ from flightsql import connect, FlightSQLClient
 client = FlightSQLClient(host='localhost',port=8082,insecure=True,metadata={'bucket':'hep'})
 conn = connect(client)
 cursor = conn.cursor()
-cursor.execute('SELECT 1, version()')
+cursor.execute('SELECT count(*), avg(temperature) FROM weather')
 print("rows:", [r for r in cursor])
 ```
 
