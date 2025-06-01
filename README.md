@@ -4,13 +4,16 @@
 
 Like a durable parquet floor, GigAPI provides rock-solid data foundation for your queries and analytics
 
-> GigAPI by Gigapipe is our twist on future query engines – one where you focus on your data, not your infrastructure, servers or capacity. By combining the performance of DuckDB with cloud-native architecture principles we've created a simple and light solution designed for unlimited time series and analytical datasets that makes traditional server-based OLAP databases feel like costly relics and decimating infrastructure costs by 50-90% without performance loss. All 100% opensource - no open core cloud gimmicks.
+### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=18 /> **Problem**
+> Traditional "always-on" OLAP databases such as ClickHouse are fast but expensive to operate, complex to manage and scale, often promoting a cloud product. Data lakes and Lake houses are cheaper but can't always handle real-time ingestion or compaction and querying growing datasets such as timeseries brings back costly operations and complexity. The _"opencore"_ poison is served.
 
-> [!WARNING]  
-> GigAPI is an open beta developed in public. Bugs and changes should be expected. Use at your own risk.
-> 
+### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=18 /> **Solution**
+> GigAPI is a timeseries optimized "lakehouse" designed for realtime data - lots of it - and returning queries as fast as possible. By combining DuckDB's performance, FlightSQL efficiency and Parquet's reliablity with smart metadata we've created a simple, lightweight solution ready to decimate complexity and infrastructure costs for ourselves and others.
+> GigAPI is _100% opensource - no open core or cloud product gimmicks_.
 
-### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=18 /> Features
+
+
+### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=18 /> GigAPI Features
 
 * Fast: DuckDB SQL + Parquet powered OLAP API Engine
 * Flexible: Schema-less Parquet Ingestion & Compaction
@@ -18,9 +21,13 @@ Like a durable parquet floor, GigAPI provides rock-solid data foundation for you
 * Smart: Independent storage/write and compute/read components
 * Extensible: Built-In Query Engine _(DuckDB)_ or BYODB _(ClickHouse, Datafusion, etc)_
 
+> [!WARNING]  
+> GigAPI is an open beta developed in public. Bugs and changes should be expected. Use at your own risk.
+
+
 ## <img src="https://github.com/user-attachments/assets/74a1fa93-5e7e-476d-93cb-be565eca4a59" height=20 /> Usage
 
-> For more usage samples see the [examples](/examples) directory
+> Here's the most basic example. For more complex usage samples see the [examples](/examples) directory
 ```yml
 services:
   gigapi:
