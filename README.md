@@ -168,6 +168,7 @@ GigAPI can be used from Grafana using the InfluxDB3 Flight GRPC Datasource
 <br>
 
 ## <img src="https://github.com/user-attachments/assets/74a1fa93-5e7e-476d-93cb-be565eca4a59" height=20 />  GigAPI Diagram
+
 ```mermaid
 %%{
   init: {
@@ -182,28 +183,39 @@ GigAPI can be used from Grafana using the InfluxDB3 Flight GRPC Datasource
     }
   }
 }%%
+graph TD
+    subgraph "GigAPI System"
+        HTTP["HTTP API"] --> DataIngestion["Data Ingestion Pipeline"]
+        GRPC["GRPC API"] --> FlightSQL["FlightSQL Service"]
 
-  graph TD;
-      GigAPI-->ParquetWriter;
-      ParquetWriter-->Storage;
-      ParquetWriter-->Metadata;
-      Storage-->Compactor;
-      Compactor-->Storage;
-      Compactor-->Metadata;
-      Storage-.->LocalFS;
-      Storage-.->S3;
-      HTTP-API-- GET/POST --> GigAPI;
-      DuckDB-->Storage;
-      DuckDB-->Metadata;
+        Configuration["Metadata Store"] --> Storage
+        Configuration --> DataIngestion
+        Configuration --> Storage
+        Configuration --> MergeProcess
+        MergeProcess --> Configuration
 
-      subgraph GigAPI[GigAPI Server]
-        ParquetWriter
-        Compactor
-        Metadata;
-        DuckDB;
-      end
+        FlightSQL["FlightSQL Service"] --> Storage["Storage System"]
+        FlightSQL["FlightSQL Service"] --> DuckDB["DuckDB Engine"]
 
+        DataIngestion --> Storage["Storage System"]
+        Storage --> MergeProcess["Merge Process"]
+        Storage --> QueryEngine["Query Engine"]
+
+        DuckDB["DuckDB Engine"] --> Configuration
+        
+        
+    end
+    
+    Client["Client Applications"] --> HTTP
+    Client["Client Applications"] --> GRPC
+    
+    Storage --> LocalFS["Local Filesystem"]
+    Storage --> S3["S3 Storage"]
+    
+    QueryEngine --> DuckDB["DuckDB Engine"]    
+    FlightSQL["FlightSQL Service"] --> Configuration
 ```
+
 
 ### Got Questions?
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/gigapi/gigapi)
