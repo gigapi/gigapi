@@ -4,24 +4,30 @@
 
 Like a durable parquet floor, GigAPI provides rock-solid data foundation for your queries and analytics
 
-> GigAPI by Gigapipe is our twist on future query engines – one where you focus on your data, not your infrastructure, servers or capacity. By combining the performance of DuckDB with cloud-native architecture principles we've created a simple and light solution designed for unlimited time series and analytical datasets that makes traditional server-based OLAP databases feel like costly relics and decimating infrastructure costs by 50-90% without performance loss. All 100% opensource - no open core cloud gimmicks.
+### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=18 /> **Problem**
+> Traditional "always-on" OLAP databases such as ClickHouse are fast but expensive to operate, complex to manage and scale, often promoting a cloud product. Data lakes and Lake houses are cheaper but can't always handle real-time ingestion or compaction and querying growing datasets such as timeseries brings back costly operations and complexity. The _"opencore"_ poison is served.
 
-> [!WARNING]  
-> GigAPI is an open beta developed in public. Bugs and changes should be expected. Use at your own risk.
-> 
+### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=18 /> **Solution**
+> GigAPI is a timeseries optimized "lakehouse" designed for realtime data - lots of it - and returning queries as fast as possible. By combining DuckDB's performance, FlightSQL efficiency and Parquet's reliablity with smart metadata we've created a simple, lightweight solution ready to decimate complexity and infrastructure costs for ourselves and others.
+> GigAPI is _100% opensource - no open core or cloud product gimmicks_.
 
-### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=18 /> Features
+
+
+### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=18 /> GigAPI Features
 
 * Fast: DuckDB SQL + Parquet powered OLAP API Engine
 * Flexible: Schema-less Parquet Ingestion & Compaction
-* Simple: Low Maintenance, Portable, Infinitely Scalable
+* Simple: Low Maintenance, Portable Catalog, Infinitely Scalable
 * Smart: Independent storage/write and compute/read components
-* Extensible: Built-In Query Engine _(DuckDB)_ or DIY _(ClickHouse, Datafusion, etc)_
+* Extensible: Built-In Query Engine _(DuckDB)_ or BYODB _(ClickHouse, Datafusion, etc)_
+
+> [!WARNING]  
+> GigAPI is an open beta developed in public. Bugs and changes should be expected. Use at your own risk.
+
 
 ## <img src="https://github.com/user-attachments/assets/74a1fa93-5e7e-476d-93cb-be565eca4a59" height=20 /> Usage
 
-> S3 Support Coming Soon
-
+> Here's the most basic example. For more complex usage samples see the [examples](/examples) directory
 ```yml
 services:
   gigapi:
@@ -45,15 +51,22 @@ services:
 | `GIGAPI_SAVE_TIMEOUT_S`    | Timeout before saving the new data to the disk (in seconds)| `1`             |
 | `GIGAPI_NO_MERGES`         | Disable merging                                            | `false`         |
 | `GIGAPI_UI`                | Enable UI for querier                                      | `true`          |
-| `GIGAPI_MODE`              | Execution mode (readonly, writeonly, compaction, aio)      | `"aio"`         |
-| `HTTP_PORT`                | Port to listen on for HTTP server                          | `7971`          |
-| `HTTP_HOST`                | Host to bind to for HTTP server                            | `"0.0.0.0"`     |
-| `HTTP_BASIC_AUTH_USERNAME` | Username for HTTP basic authentication                     |               |
-| `HTTP_BASIC_AUTH_PASSWORD` | Password for HTTP basic authentication                     |               |
-| `FLIGHTSQL_PORT`           | Port to run FlightSQL server                               | `8082`          |
-| `FLIGHTSQL_ENABLE`         | Enable FlightSQL server                                    | `true`          |
-| `LOGLEVEL`                 | Log level (debug, info, warn, error, fatal)                | `"info"`        |
+| `GIGAPI_MODE`              | Execution mode (`readonly`, `writeonly`, `compaction`, `aio`) | `"aio"`      |
+| `GIGAPI_METADATA_TYPE`     | Metadata Type (`json` for local, `redis` for distributed)  | `"json"`    |
+| `GIGAPI_METADATA_URL`      | Metadata Type URL for redis (ie: `redis://redis:6379/0`    |             |
+| `HTTP_PORT`                | Port to listen on for HTTP server                          | `7971`      |
+| `HTTP_HOST`                | Host to bind to for HTTP server                            | `"0.0.0.0"` |
+| `HTTP_BASIC_AUTH_USERNAME` | Username for HTTP basic authentication                     |             |
+| `HTTP_BASIC_AUTH_PASSWORD` | Password for HTTP basic authentication                     |             |
+| `FLIGHTSQL_PORT`           | Port to run FlightSQL server                               | `8082`      |
+| `FLIGHTSQL_ENABLE`         | Enable FlightSQL server                                    | `true`      |
+| `LOGLEVEL`                 | Log level (debug, info, warn, error, fatal)                | `"info"`    |
+| `DUCKDB_MEM_LIMIT`         | DuckDB memory limit (e.g. 1GB)                             | `"1GB"`     |
+| `DUCKDB_THREAD_LIMIT`      | DuckDB thread limit (int)                                  | `1`         |
 
+> You can override the defaults by setting these environment variables before starting the service.
+
+<br>
 
 ## <img src="https://github.com/user-attachments/assets/74a1fa93-5e7e-476d-93cb-be565eca4a59" height=20 /> Write Support
 As write requests come in to GigAPI they are parsed and progressively appeanded to parquet files alongside their metadata. The ingestion buffer is flushed to disk at configurable intervals using a hive partitioning schema. Generated parquet files and their respective metadata are progressively compacted and sorted over time based on configuration parameters.
@@ -69,8 +82,10 @@ weather,location=us-west,season=summer temperature=99
 EOF
 ```
 
+### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=18 /> FlightSQL
+
 > [!NOTE]
-> _more ingestion protocols coming soon!_
+> _FlightSQL ingestion is coming soon!_
 
 ### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=18 /> Data Schema
 GigAPI is a schema-on-write database managing databases, tables and schemas on the fly. New columns can be added or removed over time, leaving reconciliation up to readers.
@@ -133,7 +148,7 @@ from flightsql import connect, FlightSQLClient
 client = FlightSQLClient(host='localhost',port=8082,insecure=True,metadata={'bucket':'hep'})
 conn = connect(client)
 cursor = conn.cursor()
-cursor.execute('SELECT 1, version()')
+cursor.execute('SELECT count(*), avg(temperature) FROM weather')
 print("rows:", [r for r in cursor])
 ```
 
@@ -153,6 +168,7 @@ GigAPI can be used from Grafana using the InfluxDB3 Flight GRPC Datasource
 <br>
 
 ## <img src="https://github.com/user-attachments/assets/74a1fa93-5e7e-476d-93cb-be565eca4a59" height=20 />  GigAPI Diagram
+
 ```mermaid
 %%{
   init: {
@@ -167,28 +183,43 @@ GigAPI can be used from Grafana using the InfluxDB3 Flight GRPC Datasource
     }
   }
 }%%
+graph TD
+    subgraph "GigAPI System"
+        HTTP["HTTP API"] --> DataIngestion["Data Ingestion Pipeline"]
+        GRPC["GRPC API"] --> FlightSQL["FlightSQL Service"]
 
-  graph TD;
-      GigAPI-->ParquetWriter;
-      ParquetWriter-->Storage;
-      ParquetWriter-->Metadata;
-      Storage-->Compactor;
-      Compactor-->Storage;
-      Compactor-->Metadata;
-      Storage-.->LocalFS;
-      Storage-.->S3;
-      HTTP-API-- GET/POST --> GigAPI;
-      DuckDB-->Storage;
-      DuckDB-->Metadata;
+        Configuration["Metadata Store"] --> Storage
+        Configuration --> DataIngestion
+        Configuration --> Storage
+        Configuration --> MergeProcess
+        MergeProcess --> Configuration
 
-      subgraph GigAPI[GigAPI Server]
-        ParquetWriter
-        Compactor
-        Metadata;
-        DuckDB;
-      end
+        FlightSQL["FlightSQL Service"] --> Storage["Storage System"]
+        FlightSQL["FlightSQL Service"] --> DuckDB["DuckDB Engine"]
 
+        DataIngestion --> Storage["Storage System"]
+        Storage --> MergeProcess["Merge Process"]
+        Storage --> QueryEngine["Query Engine"]
+
+        DuckDB["DuckDB Engine"] --> Configuration
+        
+        
+    end
+    
+    Client["Client Applications"] --> HTTP
+    Client["Client Applications"] --> GRPC
+    
+    Storage --> LocalFS["Local Filesystem"]
+    Storage --> S3["S3 Storage"]
+    
+    QueryEngine --> DuckDB["DuckDB Engine"]    
+    FlightSQL["FlightSQL Service"] --> Configuration
 ```
+
+
+### Got Questions?
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/gigapi/gigapi)
+
 
 ### Contributors
 
@@ -198,10 +229,10 @@ GigAPI can be used from Grafana using the InfluxDB3 Flight GRPC Datasource
 
 [![Stargazers for @metrico/quackpipe](https://reporoster.com/stars/gigapi/gigapi)](https://github.com/gigapi/gigapi/stargazers)
 
-
 ###### :black_joker: Disclaimers 
 
 [^1]: DuckDB ® is a trademark of DuckDB Foundation. All rights reserved by their respective owners. [^1]
 [^2]: ClickHouse ® is a trademark of ClickHouse Inc. No direct affiliation or endorsement. [^2]
 [^3]: InfluxDB ® is a trademark of InfluxData. No direct affiliation or endorsement. [^3]
 [^4]: Released under the MIT license. See LICENSE for details. All rights reserved by their respective owners. [^4]
+
