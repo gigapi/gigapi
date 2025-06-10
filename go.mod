@@ -2,18 +2,14 @@ module github.com/gigapi/gigapi/v2
 
 go 1.24.2
 
-replace (
-	github.com/gigapi/gigapi-querier v0.0.19 => ./deps/querier
-	github.com/gigapi/metadata v0.0.3 => ../metadata
-	github.com/gigapi/gigapi-config v0.0.7 => ../gigapi-config
-)
+replace github.com/gigapi/gigapi-querier v0.0.19 => ./deps/querier
 
 require (
 	github.com/apache/arrow/go/v14 v14.0.2
 	github.com/expr-lang/expr v1.17.2
-	github.com/gigapi/gigapi-config v0.0.7
+	github.com/gigapi/gigapi-config v0.0.8
 	github.com/gigapi/gigapi-querier v0.0.19
-	github.com/gigapi/metadata v0.0.3
+	github.com/gigapi/metadata v0.0.4
 	github.com/go-faster/city v1.0.1
 	github.com/go-faster/jx v1.1.0
 	github.com/google/uuid v1.6.0
@@ -64,10 +60,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pelletier/go-toml/v2 v2.1.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
-	github.com/pingcap/errors v0.11.5-0.20240311024730-e056997136bb // indirect
-	github.com/pingcap/failpoint v0.0.0-20240528011301-b51a646c7c86 // indirect
-	github.com/pingcap/log v1.1.0 // indirect
-	github.com/pingcap/tidb/pkg/parser v0.0.0-20250527095849-73673086c08d // indirect
 	github.com/redis/go-redis/v9 v9.8.0 // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
@@ -79,7 +71,6 @@ require (
 	github.com/spf13/viper v1.18.1 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
-	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
@@ -93,6 +84,5 @@ require (
 	google.golang.org/grpc v1.69.2 // indirect
 	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
-	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
