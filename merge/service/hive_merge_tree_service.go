@@ -14,6 +14,7 @@ import (
 	"github.com/gigapi/gigapi/v2/utils"
 	"github.com/gigapi/metadata"
 	"github.com/go-faster/city"
+	"golang.org/x/sync/errgroup"
 	"io/fs"
 	"math"
 	"os"
@@ -189,10 +190,10 @@ func NewHiveMergeTreeService(t *shared.Table) (*HiveMergeTreeService, error) {
 	}
 
 	res.flushCtx, res.doFlush = context.WithTimeout(context.Background(), time.Second)
-	err := res.discoverPartitions()
+	/*err := res.discoverPartitions()
 	if err != nil {
 		return nil, err
-	}
+	}*/
 	//err := res.parsePartitionInfo()
 	return res, nil
 }
@@ -499,18 +500,18 @@ func (h *HiveMergeTreeService) planMergeIteration(layer config.LayersConfigurati
 func (h *HiveMergeTreeService) Merge(plan map[string][]metadata.MergePlan) error {
 	fmt.Println("Starting merges...")
 	start := time.Now()
-	//eg := &errgroup.Group{}
+	eg := &errgroup.Group{}
 	for layer, plans := range plan {
-		_layer := layer
-		_plans := plans
-		err := h.mergeService[_layer].DoMerge(_plans)
-		if err != nil {
+		eg.Go(func() error {
+			_layer := layer
+			_plans := plans
+			err := h.mergeService[_layer].DoMerge(_plans)
 			return err
-		}
+		})
 	}
-	//err := eg.Wait()
+	err := eg.Wait()
 	fmt.Printf("Merge time: %v\n", time.Since(start))
-	return nil
+	return err
 }
 
 func (h *HiveMergeTreeService) DoMerge() error {

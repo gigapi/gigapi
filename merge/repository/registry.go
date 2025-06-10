@@ -98,7 +98,7 @@ func getTableIndex(table *shared.Table) (metadata.TableIndex, error) {
 			config.Config.Gigapi.Root,
 			table.Database,
 			table.Name,
-			layers), nil
+			layers)
 	case "redis":
 		return metadata.NewRedisIndex(
 			config.Config.Gigapi.Metadata.URL,

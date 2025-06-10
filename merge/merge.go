@@ -16,7 +16,10 @@ func Init(api modules.Api) {
 	if config.Config.Gigapi.Mode != "writeonly" && config.Config.Gigapi.Mode != "aio" {
 		return
 	}
-	metadata.MergeConfigurations = shared.GetMergeConfigurations()
+	metadata.MergeConfigurations = nil
+	for _, mc := range shared.GetMergeConfigurations() {
+		metadata.MergeConfigurations = append(metadata.MergeConfigurations, mc)
+	}
 	err := os.MkdirAll(config.Config.Gigapi.Root, 0750)
 	if err != nil {
 		panic(err)
