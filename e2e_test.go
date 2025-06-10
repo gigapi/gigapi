@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/gigapi/gigapi-config/config"
@@ -9,6 +10,8 @@ import (
 	utils2 "github.com/gigapi/gigapi/v2/merge/utils"
 	"github.com/gigapi/gigapi/v2/utils"
 	"io"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"runtime/pprof"
 	"strings"
@@ -122,6 +125,41 @@ type File struct {
 	MaxTime   int64  `json:"max_time"`
 	Range     string `json:"range"`
 	Type      string `json:"type"`
+}
+
+func TestConsistency(t *testing.T) {
+	count := 0
+	nowNs := time.Now().UnixNano()
+	tillNextSec := 1000000000 - nowNs%1000000000
+	time.Sleep(time.Nanosecond * time.Duration(tillNextSec))
+	tck := time.NewTicker(time.Second)
+	for range tck.C {
+		url := "http://localhost:7971/gigapi/write"
+		data := `weather,location=us-midwest,season=summer temperature=82 1748253664000000000
+weather,location=us-midwest,season=summer temperature=83 1748253664000000000
+weather,location=us-midwest,season2=summer2 temperature=84 1748253664000000000
+weather,location=us-midwest,season2=summer2 temperature=84 1748253664000000000`
+
+		req, err := http.NewRequest("POST", url, bytes.NewBufferString(data))
+		if err != nil {
+			t.Fatal("error creating request: ", err)
+		}
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal("error sending request: ", err)
+		}
+		defer resp.Body.Close()
+
+		_, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal("error reading response: ", err)
+		}
+		count += 4
+		fmt.Printf("Total rows: %d\n", count)
+	}
+
 }
 
 func TestMetadataFiles(t *testing.T) {

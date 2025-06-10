@@ -1,6 +1,7 @@
 package service
 
 import (
+	"github.com/gigapi/gigapi-config/config"
 	"github.com/gigapi/gigapi/v2/merge/data_types"
 	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/gigapi/gigapi/v2/utils"
@@ -138,6 +139,7 @@ func (p *Partition) Save() {
 		size := unordered.GetSize()
 
 		prom := p.index.Batch([]*metadata.IndexEntry{{
+			Layer:     config.Config.Gigapi.Layers[0].Name,
 			Database:  p.table.Database,
 			Table:     p.table.Name,
 			Path:      fName,
@@ -148,6 +150,8 @@ func (p *Partition) Save() {
 			Max:       nil,
 			MinTime:   minTime.(int64),
 			MaxTime:   maxTime.(int64),
+			//TODO
+			WriterID: "",
 		}}, nil)
 		_, err = prom.Get()
 		if err != nil {

@@ -154,6 +154,10 @@ func (l *LineProtoParser) parse(scanner *bufio.Scanner, res chan *ParserResponse
 				data["time"] = []int64{}
 			}
 			data["time"] = append(data["time"].([]int64), p.Time().UnixNano())
+			if _, ok := data["__timestamp"]; !ok {
+				data["__timestamp"] = []int64{}
+			}
+			data["__timestamp"] = append(data["__timestamp"].([]int64), p.Time().UnixNano())
 		}
 	}
 

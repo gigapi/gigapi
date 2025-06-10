@@ -8,7 +8,6 @@ import (
 	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/gigapi/gigapi/v2/merge/utils"
 	"github.com/gigapi/metadata"
-	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"html/template"
 	"io"
@@ -157,6 +156,7 @@ func (f *fsMergeService) mergeFirstIteration(p metadata.MergePlan) error {
 		strings.Join(f.table.OrderBy, " ASC,")+" ASC", tmpFilePath)
 	_, err = conn.Exec(createTableSQL)
 	if err != nil {
+		fmt.Println(createTableSQL)
 		fmt.Println("Error read_parquet_mergetree: ", err)
 		return err
 	}
@@ -173,22 +173,7 @@ func (f *fsMergeService) mergeFirstIteration(p metadata.MergePlan) error {
 		}
 	}
 
-	f.cleanup(p)
-
 	return nil
-}
-
-func (f *fsMergeService) cleanup(p metadata.MergePlan) {
-	for _, file := range p.From {
-		_file := file
-		go func() {
-			<-time.After(time.Second * 30)
-			os.Remove(filepath.Join(f.dataPath, _file))
-			if f.index != nil {
-				f.index.RmFromDropQueue([]string{_file})
-			}
-		}()
-	}
 }
 
 func (f *fsMergeService) mergeMany(p metadata.MergePlan) error {
@@ -204,20 +189,26 @@ func (f *fsMergeService) mergeMany(p metadata.MergePlan) error {
 
 	tmpFilePath := filepath.Join(f.tmpPath, filepath.Base(p.To))
 
+	from := make([]string, len(p.From))
+	for i, p := range p.From {
+		from[i] = filepath.Join(f.dataPath, p)
+	}
+
 	createTableSQL := fmt.Sprintf(
 		`COPY(SELECT * FROM read_parquet_mergetree(ARRAY['%s'], '%s'))TO '%s' (FORMAT 'parquet')`,
-		strings.Join(f.getAbsPaths(p.From), "','"),
+		strings.Join(from, "','"),
 		strings.Join(f.table.OrderBy, ","),
 		tmpFilePath,
 	)
 	_, err = conn.Exec(createTableSQL)
 
 	if err != nil {
+		fmt.Println(createTableSQL)
 		fmt.Println("Error read_parquet_mergetree: ", err)
 		return err
 	}
 
-	err = os.Rename(tmpFilePath, p.To)
+	err = os.Rename(tmpFilePath, path.Join(f.dataPath, p.To))
 	return err
 }
 
@@ -238,7 +229,8 @@ func (f *fsMergeService) merge(p metadata.MergePlan) error {
 	var err error
 
 	if len(p.From) == 1 {
-		err = os.Rename(p.From[0], filepath.Join(f.dataPath, p.To))
+		from := filepath.Join(f.dataPath, p.From[0])
+		err = os.Rename(from, filepath.Join(f.dataPath, p.To))
 	} else {
 		err = f.mergeMany(p)
 	}
@@ -253,7 +245,6 @@ func (f *fsMergeService) merge(p metadata.MergePlan) error {
 		}
 	}
 
-	f.cleanup(p)
 	return nil
 }
 
@@ -266,11 +257,13 @@ func (f *fsMergeService) updateIndex(merge metadata.MergePlan) error {
 	toDelete := make([]*metadata.IndexEntry, len(merge.From))
 	for i, file := range merge.From {
 		toDelete[i] = &metadata.IndexEntry{
+			Layer:    merge.Layer,
 			Database: f.table.Database,
 			Table:    f.table.Name,
 			Path:     file,
+			WriterID: merge.WriterID,
 		}
-		fromIdx := f.index.Get(file)
+		fromIdx := f.index.Get(merge.Layer, file)
 		if i == 0 {
 			minTime = fromIdx.MinTime
 			maxTime = fromIdx.MaxTime
@@ -289,6 +282,9 @@ func (f *fsMergeService) updateIndex(merge metadata.MergePlan) error {
 		return err
 	}
 	newIdx := &metadata.IndexEntry{
+		Layer:     merge.Layer,
+		Database:  f.table.Database,
+		Table:     f.table.Name,
 		Path:      merge.To,
 		SizeBytes: stat.Size(),
 		RowCount:  rowCount,
@@ -297,31 +293,32 @@ func (f *fsMergeService) updateIndex(merge metadata.MergePlan) error {
 		Max:       _max,
 		MinTime:   minTime,
 		MaxTime:   maxTime,
-		Database:  f.table.Database,
-		Table:     f.table.Name,
+		WriterID:  "",
 	}
 	prom := f.index.Batch([]*metadata.IndexEntry{newIdx}, toDelete)
 	_, err = prom.Get()
 	if err != nil {
 		return err
 	}
-	err = f.index.GetMergePlanner().EndMerge(&merge)
+	fmt.Printf("Finishing merge: %v\n", merge)
+	_, err = f.index.GetMergePlanner().EndMerge(merge).Get()
 	return err
 }
 
 func (f *fsMergeService) doMerge(merges []metadata.MergePlan, merge func(p metadata.MergePlan) error) error {
-	errGroup := errgroup.Group{}
-	sem := semaphore.NewWeighted(10)
+	//errGroup := errgroup.Group{}
+	//sem := semaphore.NewWeighted(10)
 	for _, m := range merges {
-
 		_m := m
-		errGroup.Go(func() error {
-			sem.Acquire(context.Background(), 1)
-			defer sem.Release(1)
-			return merge(_m)
-		})
+		/*sem.Acquire(context.Background(), 1)
+		defer sem.Release(1)*/
+		err := merge(_m)
+		if err != nil {
+			//errGroup.Cancel(err)
+			return err
+		}
 	}
-	return errGroup.Wait()
+	return nil
 }
 
 func (f *fsMergeService) DoMerge(merges []metadata.MergePlan) error {
