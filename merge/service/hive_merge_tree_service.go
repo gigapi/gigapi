@@ -193,7 +193,7 @@ func NewHiveMergeTreeService(t *shared.Table) (*HiveMergeTreeService, error) {
 	/*err := res.discoverPartitions()
 	if err != nil {
 		return nil, err
-	}
+	}*/
 	//err := res.parsePartitionInfo()
 	return res, nil
 }
