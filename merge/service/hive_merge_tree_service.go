@@ -168,7 +168,6 @@ func NewHiveMergeTreeService(t *shared.Table) (*HiveMergeTreeService, error) {
 		moveService:  make(map[string]*moveService),
 		dropService:  make(map[string]*dropService),
 	}
-
 	for _, l := range config.Config.Gigapi.Layers {
 		dataPath := buildPath(l, t, "data")
 		tmpPath := buildPath(l, t, "data")
