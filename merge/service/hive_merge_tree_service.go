@@ -155,7 +155,19 @@ var re = regexp.MustCompile(`[\\./]`)
 func buildPath(layer config.LayersConfiguration, t *shared.Table, suffix string) string {
 	database := re.ReplaceAllString(t.Database, "_")
 	table := re.ReplaceAllString(t.Name, "_")
-	return filepath.Join(strings.TrimPrefix(layer.URL, "file://"), database, table, suffix)
+	path := filepath.Join(strings.TrimPrefix(layer.URL, "file://"), database, table, suffix)
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return ""
+	}
+	layerAbsPath, err := filepath.Abs(strings.TrimPrefix(layer.URL, "file://"))
+	if err != nil {
+		return ""
+	}
+	if strings.HasPrefix(absPath, layerAbsPath) {
+		return path
+	}
+	return ""
 }
 
 func NewHiveMergeTreeService(t *shared.Table) (*HiveMergeTreeService, error) {
