@@ -202,18 +202,27 @@ For each layer, the following parameters can be configured:
 - `TTL`: Time-to-Live duration before data moves to the next layer (use `0` for no expiration).
 
 Here's an example of layer configuration using environment variables:
-```
+```bash
+# Local Storage, Fastest, 30 minutes TTL
 GIGAPI_LAYERS_0_NAME=cache
 GIGAPI_LAYERS_0_TYPE=fs
 GIGAPI_LAYERS_0_URL=file:///data
 GIGAPI_LAYERS_0_GLOBAL=false
-GIGAPI_LAYERS_0_TTL=10s
+GIGAPI_LAYERS_0_TTL=30m
 
-GIGAPI_LAYERS_0_NAME=s3
-GIGAPI_LAYERS_0_TYPE=s3
-GIGAPI_LAYERS_0_URL=s3://api_key:api_secret@s3.server.hostname/bucket/prefix/to/layer
-GIGAPI_LAYERS_0_GLOBAL=true
-GIGAPI_LAYERS_0_TTL=0
+# Remote Layer 1, Fast-enough, 4 weeks TTL
+GIGAPI_LAYERS_1_NAME=s3
+GIGAPI_LAYERS_1_TYPE=s3
+GIGAPI_LAYERS_1_URL=s3://api_key:api_secret@s3.server.hostname/bucket/prefix/to/layer
+GIGAPI_LAYERS_1_GLOBAL=true
+GIGAPI_LAYERS_1_TTL=4w
+
+# Remote Layer 2, Slower, forever TTL
+GIGAPI_LAYERS_2_NAME=r2
+GIGAPI_LAYERS_2_TYPE=r2
+GIGAPI_LAYERS_2_URL=s3://api_key:api_secret@r2.server.hostname/bucket/prefix/to/layer
+GIGAPI_LAYERS_2_GLOBAL=true
+GIGAPI_LAYERS_2_TTL=0
 ```
 
 In this configuration:
