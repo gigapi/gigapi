@@ -9,26 +9,35 @@ import (
 	"github.com/gigapi/gigapi/v2/utils"
 	"io"
 	"net/http"
+	"strings"
 )
 
 var API modules.Api
 
-func getDatabase(r *http.Request) string {
-	if db := r.URL.Query().Get("db"); db != "" {
-		return db
+func getDatabase(r *http.Request) (string, error) {
+	db := r.URL.Query().Get("db")
+	if db == "" {
+		vars := API.GetPathParams(r)
+		db = vars["db"]
 	}
-	vars := API.GetPathParams(r)
-	if db, ok := vars["db"]; ok {
-		return db
+	if db == "" {
+		db = "default"
 	}
-	return ""
+	if strings.Contains(db, "/") || strings.Contains(db, ".") {
+		return "", utils.NewGigapiError("Invalid database name", http.StatusBadRequest)
+	}
+
+	return db, nil
 }
 
 func InsertIntoHandler(w http.ResponseWriter, r *http.Request) error {
 	contentType := r.Header.Get("Content-Type")
 	parser, err := parsers.GetParser(contentType, nil, nil)
 
-	database := getDatabase(r)
+	database, err := getDatabase(r)
+	if err != nil {
+		return err
+	}
 
 	ctx := r.Context()
 	precision := r.URL.Query().Get("precision")
