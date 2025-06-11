@@ -23,7 +23,7 @@ func getDatabase(r *http.Request) (string, error) {
 	if db == "" {
 		db = "default"
 	}
-	if strings.Contains(db, "/") || strings.Contains(db, ".") {
+	if strings.Contains(db, "/") || strings.Contains(db, ".") || strings.Contains(db, "\\") {
 		return "", utils.NewGigapiError("Invalid database name", http.StatusBadRequest)
 	}
 
