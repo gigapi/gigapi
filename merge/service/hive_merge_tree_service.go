@@ -173,14 +173,26 @@ func NewHiveMergeTreeService(t *shared.Table) (*HiveMergeTreeService, error) {
 		dropService:  make(map[string]*dropService),
 	}
 	for _, l := range config.Config.Gigapi.Layers {
-		dataPath, err := buildPath(l, t, "data")
-		if err != nil {
-			return nil, err
+		//dataPath, err := buildPath(l, t, "data")
+		if strings.Contains("\\", t.Database) || strings.Contains("/", t.Database) ||
+			strings.Contains("..", t.Database) {
+			return nil, fmt.Errorf("invalid database name: %q", t.Database)
 		}
-		tmpPath, err := buildPath(l, t, "tmp")
-		if err != nil {
-			return nil, err
+		if strings.Contains("\\", t.Name) || strings.Contains("/", t.Name) ||
+			strings.Contains("..", t.Name) {
+			return nil, fmt.Errorf("invalid table name: %q", t.Name)
 		}
+		dataPath := filepath.Join(strings.TrimPrefix(l.URL, "file://"), t.Database, t.Name, "data")
+		//tmpPath, err := buildPath(l, t, "tmp")
+		if strings.Contains("\\", t.Database) || strings.Contains("/", t.Database) ||
+			strings.Contains("..", t.Database) {
+			return nil, fmt.Errorf("invalid database name: %q", t.Database)
+		}
+		if strings.Contains("\\", t.Name) || strings.Contains("/", t.Name) ||
+			strings.Contains("..", t.Name) {
+			return nil, fmt.Errorf("invalid table name: %q", t.Name)
+		}
+		tmpPath := filepath.Join(strings.TrimPrefix(l.URL, "file://"), t.Database, t.Name, "tmp")
 		os.MkdirAll(dataPath, 0o755)
 		os.MkdirAll(tmpPath, 0o755)
 		res.mergeService[l.Name] = &fsMergeService{
