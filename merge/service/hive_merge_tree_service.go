@@ -21,6 +21,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -151,6 +152,14 @@ type HiveMergeTreeService struct {
 	dropService  map[string]*dropService
 }
 
+var re = regexp.MustCompile(`[\\./]`)
+
+func buildPath(layer config.LayersConfiguration, t *shared.Table, suffix string) string {
+	database := re.ReplaceAllString(t.Database, "_")
+	table := re.ReplaceAllString(t.Name, "_")
+	return filepath.Join(strings.TrimPrefix(layer.URL, "file://"), database, table, suffix)
+}
+
 func NewHiveMergeTreeService(t *shared.Table) (*HiveMergeTreeService, error) {
 	res := &HiveMergeTreeService{
 		MergeTreeService: &MergeTreeService{
@@ -163,8 +172,8 @@ func NewHiveMergeTreeService(t *shared.Table) (*HiveMergeTreeService, error) {
 	}
 
 	for _, l := range config.Config.Gigapi.Layers {
-		dataPath := filepath.Join(strings.TrimPrefix(l.URL, "file://"), t.Database, t.Name, "data")
-		tmpPath := filepath.Join(strings.TrimPrefix(l.URL, "file://"), t.Database, t.Name, "tmp")
+		dataPath := buildPath(l, t, "data")
+		tmpPath := buildPath(l, t, "data")
 		os.MkdirAll(dataPath, 0o755)
 		os.MkdirAll(tmpPath, 0o755)
 		res.mergeService[l.Name] = &fsMergeService{
@@ -256,8 +265,8 @@ func (h *HiveMergeTreeService) discoverPartitionsByLayer(l config.LayersConfigur
 		id := h.calculatePartitionHash(values)
 		if _, ok := h.partitions[l.Name][id]; !ok {
 			h.partitions[l.Name][id], err = NewPartition(values,
-				path.Join(strings.TrimPrefix(l.URL, "file://"), h.Table.Path, "tmp"),
-				path.Join(strings.TrimPrefix(l.URL, "file://"), h.Table.Path, "data"),
+				buildPath(l, h.Table, "tmp"),
+				buildPath(l, h.Table, "data"),
 				h.getPartPath(values),
 				h.Table)
 			if err != nil {
@@ -433,8 +442,8 @@ func (h *HiveMergeTreeService) Store(columns map[string]any) utils.Promise[int32
 		id := h.calculatePartitionHash(part.Values)
 		if _, ok := h.partitions[config.Config.Gigapi.Layers[0].Name][id]; !ok {
 			h.partitions[config.Config.Gigapi.Layers[0].Name][id], err = NewPartition(part.Values,
-				path.Join(strings.TrimPrefix(config.Config.Gigapi.Layers[0].URL, "file://"), h.Table.Path, "tmp"),
-				path.Join(strings.TrimPrefix(config.Config.Gigapi.Layers[0].URL, "file://"), h.Table.Path, "data"),
+				buildPath(config.Config.Gigapi.Layers[0], h.Table, "tmp"),
+				buildPath(config.Config.Gigapi.Layers[0], h.Table, "data"),
 				h.getPartPath(part.Values),
 				h.Table)
 			if err != nil {
