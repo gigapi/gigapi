@@ -9,11 +9,9 @@ import (
 	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/gigapi/gigapi/v2/utils"
 	"github.com/gigapi/metadata"
-	"os"
 	"path"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"sync"
 	"time"
 )
@@ -85,11 +83,28 @@ func Store(db string, name string, columns map[string]any) utils.Promise[int32] 
 }
 
 func getTableIndex(table *shared.Table) (metadata.TableIndex, error) {
+	layers := make([]metadata.Layer, len(config.Config.Gigapi.Layers))
+	for i, l := range config.Config.Gigapi.Layers {
+		layers[i] = metadata.Layer{
+			URL:    l.URL,
+			Name:   l.Name,
+			Type:   l.Type,
+			TTLSec: int32(l.TTL.Seconds()),
+		}
+	}
 	switch config.Config.Gigapi.Metadata.Type {
 	case "json":
-		return metadata.NewJSONIndex(config.Config.Gigapi.Root, table.Database, table.Name), nil
+		return metadata.NewJSONIndex(
+			config.Config.Gigapi.Root,
+			table.Database,
+			table.Name,
+			layers)
 	case "redis":
-		return metadata.NewRedisIndex(config.Config.Gigapi.Metadata.URL, table.Database, table.Name)
+		return metadata.NewRedisIndex(
+			config.Config.Gigapi.Metadata.URL,
+			table.Database,
+			table.Name,
+			layers)
 	}
 	return nil, fmt.Errorf("unknown metadata type: %q", config.Config.Gigapi.Metadata.Type)
 }
@@ -110,7 +125,7 @@ func RegisterSimpleTable(db, name string) error {
 		Name:     name,
 		Engine:   "HiveMerge",
 		OrderBy:  []string{"__timestamp"},
-		Path:     path.Join(config.Config.Gigapi.Root, db, name),
+		Path:     path.Join(db, name),
 		PartitionBy: func(m map[string]data_types.IColumn) ([]shared.PartitionDesc, error) {
 			tsCol, ok := m["__timestamp"]
 			if !ok {
@@ -155,23 +170,26 @@ func RegisterSimpleTable(db, name string) error {
 }
 
 func RegisterNewTable(table *shared.Table) error {
+	var err error
 	if !tableNameCheck.MatchString(table.Name) {
 		return fmt.Errorf("invalid table name, only letters and _ are accepted: %q", table.Name)
 	}
 	if table.Path == "" {
-		table.Path = filepath.Join(config.Config.Gigapi.Root, table.Database, table.Name)
+		table.Path = filepath.Join(table.Database, table.Name)
 	}
 	if _, ok := registry[[2]string{table.Database, table.Name}]; ok {
 		return nil
 	}
-	_table := *table
-	if strings.HasPrefix(table.Path, "s3://") {
-		_table.Path = path.Join(config.Config.Gigapi.Root, table.Database, table.Name)
-	}
-	err := createTableFolders(&_table)
-	if err != nil {
-		return err
-	}
+	/*
+		_table := *table
+		if strings.HasPrefix(table.Path, "s3://") {
+			_table.Path = path.Join(config.Config.Gigapi.Root, table.Database, table.Name)
+		}
+		err := createTableFolders(&_table)
+
+		if err != nil {
+			return err
+		}*/
 	/*err = InsertTableMetadata(conn, table)
 	if err != nil {
 		return err
@@ -211,7 +229,7 @@ func PopulateRegistry() error {
 
 }
 
-func createTableFolders(table *shared.Table) error {
+/*func createTableFolders(table *shared.Table) error {
 	if !tableNameCheck.MatchString(table.Name) {
 		return fmt.Errorf("invalid table name, only letters and _ are accepted: %q", table.Name)
 	}
@@ -220,4 +238,4 @@ func createTableFolders(table *shared.Table) error {
 		return err
 	}
 	return os.MkdirAll(filepath.Join(table.Path, "data"), 0755)
-}
+}*/

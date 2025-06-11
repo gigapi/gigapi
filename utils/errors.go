@@ -17,3 +17,10 @@ func (g *GigapiError) Error() string {
 func (g *GigapiError) Code() int {
 	return g.code
 }
+
+func NewGigapiError(message string, code int) *GigapiError {
+	return &GigapiError{
+		message: message,
+		code:    code,
+	}
+}

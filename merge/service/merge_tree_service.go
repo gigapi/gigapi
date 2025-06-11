@@ -271,6 +271,10 @@ func (s *MergeTreeService) AutoTimestamp(columns map[string]data_types.IColumn) 
 		return columns, nil
 	}
 
+	if columns["__timestamp"] != nil && columns["__timestamp"].GetTypeName() == data_types.DATA_TYPE_NAME_INT64 {
+		return columns, nil
+	}
+
 	var sz int64
 	for _, col := range columns {
 		sz = col.GetLength()

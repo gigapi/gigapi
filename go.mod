@@ -5,9 +5,9 @@ go 1.24.2
 require (
 	github.com/apache/arrow/go/v14 v14.0.2
 	github.com/expr-lang/expr v1.17.2
-	github.com/gigapi/gigapi-config v0.0.7
-	github.com/gigapi/gigapi-querier v0.0.20
-	github.com/gigapi/metadata v0.0.3
+	github.com/gigapi/gigapi-config v0.0.8
+	github.com/gigapi/gigapi-querier v0.0.21
+	github.com/gigapi/metadata v0.0.4
 	github.com/go-faster/city v1.0.1
 	github.com/go-faster/jx v1.1.0
 	github.com/google/uuid v1.6.0
@@ -69,7 +69,7 @@ require (
 	github.com/spf13/viper v1.18.1 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
-	go.uber.org/multierr v1.10.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
 	golang.org/x/mod v0.24.0 // indirect

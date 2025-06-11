@@ -1,15 +1,19 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/gigapi/gigapi-config/config"
 	"github.com/gigapi/gigapi/v2/merge"
 	"github.com/gigapi/gigapi/v2/merge/repository"
 	utils2 "github.com/gigapi/gigapi/v2/merge/utils"
-	"github.com/gigapi/gigapi/v2/utils"
+	"github.com/gigapi/gigapi/v2/router"
 	"io"
+	"io/ioutil"
+	"net/http"
 	"os"
+	"path/filepath"
 	"runtime/pprof"
 	"strings"
 	"sync"
@@ -32,52 +36,20 @@ func startCPUProfile(t *testing.T) func() {
 	}
 }
 
-func writeMemProfile(t *testing.T) {
-	memFile, err := os.Create("mem.pprof")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer memFile.Close()
-	if err := pprof.WriteHeapProfile(memFile); err != nil {
-		t.Fatal(err)
+const N = 200
+const S = 10000
+
+func runServer() {
+	initModules()
+	r := router.NewRouter()
+	fmt.Printf("GigAPI Running: %s:%d\n", config.Config.HTTP.Host, config.Config.HTTP.Port)
+	if err := http.ListenAndServe(fmt.Sprintf("%s:%d",
+		config.Config.HTTP.Host, config.Config.HTTP.Port), r); err != nil {
+		panic(err)
 	}
 }
 
-const N = 200
-const S = 100000
-
-func TestE2E(t *testing.T) {
-	// Start CPU profiling
-	stopCPUProfile := startCPUProfile(t)
-	defer stopCPUProfile()
-
-	config.Config = &config.Configuration{
-		Gigapi: config.GigapiConfiguration{
-			Root:          "_testdata",
-			MergeTimeoutS: 10,
-			Mode:          "aio",
-			Metadata: config.MetadataConfiguration{
-				Type: "redis",
-				URL:  "redis://localhost:6379/0",
-			},
-		},
-	}
-	merge.Init(&api{})
-
-	var data = map[string]any{
-		"timestamp": []int64{},
-		"value":     []float64{},
-		"str":       []string{},
-	}
-	promises := make([]utils.Promise[int32], N)
-	size := 0
-	for i := 0; i < S; i++ {
-		data["timestamp"] = append(data["timestamp"].([]int64), int64(time.Now().UnixNano()))
-		data["value"] = append(data["value"].([]float64), float64(i)/100.0)
-		str := fmt.Sprintf("str%d", i)
-		data["str"] = append(data["str"].([]string), str)
-		size += 8 + 8 + 8 + 1 + len(str)
-	}
+func testE2EWriting(t *testing.T) {
 	start := time.Now()
 	wg := sync.WaitGroup{}
 	for i := 0; i < N; i++ {
@@ -85,21 +57,114 @@ func TestE2E(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			promises[_i] = repository.Store("", "test", data)
+			var data strings.Builder
+			for j := 0; j < S; j++ {
+				data.WriteString(fmt.Sprintf("logs,instance=1,level=info msg=\"Hello world %d\"\n", _i))
+			}
+			_, err := http.Post("http://localhost:7988/gigapi/insert", "", bytes.NewBuffer(
+				[]byte(data.String())))
+			if err != nil {
+				panic(err)
+			}
 		}()
-
 	}
 	wg.Wait()
-	fmt.Printf("Appending data %v\n", time.Since(start))
-	for _, pp := range promises {
-		_, err := pp.Get()
+	fmt.Printf("%d rows MB written in %v\n", S*N, time.Since(start))
+	parquets := 0
+	filepath.Walk("./_testdata/l1", func(path string, info os.FileInfo, err error) error {
+		if info == nil {
+			return nil
+		}
+		if strings.HasSuffix(info.Name(), ".parquet") {
+			parquets++
+		}
+		return nil
+	})
+	fmt.Printf("Found %d parquets\n", parquets)
+	fmt.Println("Wating for merge...")
+	time.Sleep(time.Second * 75)
+	parquets = 0
+	filepath.Walk("./_testdata/l1", func(path string, info os.FileInfo, err error) error {
+		if info == nil {
+			return nil
+		}
+		if strings.HasSuffix(info.Name(), ".parquet") {
+			parquets++
+		}
+		return nil
+	})
+	fmt.Printf("Found %d parquets\n", parquets)
+}
+
+func testE2EReading(t *testing.T) {
+	var requests = []string{
+		`{"query": "SELECT count() as c FROM logs"}`,
+		`{"query": "SHOW DATABASES"}`,
+		`{"query": "SHOW TABLES"}`,
+	}
+	var responses = []string{
+		`{"results":[{"c":"2000000"}]}`,
+		`{"results":[{"database_name":"default"}]}`,
+		`{"results":[{"table_name":"logs"}]}`,
+	}
+	for i, reqBody := range requests {
+		res, err := http.Post("http://localhost:7988/query?db=default&format=json", "application/json",
+			bytes.NewBuffer([]byte(reqBody)))
 		if err != nil {
 			panic(err)
 		}
+		if res.StatusCode/100 != 2 {
+			body, _ := io.ReadAll(res.Body)
+			panic(fmt.Sprintf("[%d]: %s", res.StatusCode, string(body)))
+		}
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			panic(err)
+		}
+		strBody := strings.TrimSpace(string(body))
+		fmt.Println(strBody)
+		if strBody != responses[i] {
+			panic(fmt.Sprintf("Unexpected response: `%s`", strBody))
+		}
 	}
-	fmt.Printf("%d rows / %v MB written in %v\n", S*N, float64(size*N)/(1024*1024), time.Since(start))
-	fmt.Println("Wating for merge...")
-	time.Sleep(time.Second * 75)
+
+}
+
+func TestE2E(t *testing.T) {
+	// Start CPU profiling
+	stopCPUProfile := startCPUProfile(t)
+	defer stopCPUProfile()
+	defer os.RemoveAll("_testdata/l1")
+
+	config.Config = &config.Configuration{
+		Gigapi: config.GigapiConfiguration{
+			Root:          "_testdata",
+			MergeTimeoutS: 10,
+			Mode:          "aio",
+			Metadata: config.MetadataConfiguration{
+				Type: "json",
+			},
+			Layers: []config.LayersConfiguration{
+				{
+					Name:   "l1",
+					Type:   "fs",
+					Global: false,
+					URL:    "file://./_testdata/l1",
+					TTL:    0,
+				},
+			},
+		},
+		HTTP: config.HTTPConfiguration{
+			Port:      7988,
+			Host:      "localhost",
+			BasicAuth: config.BasicAuthConfiguration{},
+		},
+		FlightSql: config.FlightSqlConfiguration{Port: 7989},
+	}
+	go runServer()
+	time.Sleep(time.Second)
+	testE2EWriting(t)
+	testE2EReading(t)
 }
 
 type ParquetData struct {
@@ -124,7 +189,48 @@ type File struct {
 	Type      string `json:"type"`
 }
 
+func TestConsistency(t *testing.T) {
+	if os.Getenv("INTERNAL_TEST") != "1" {
+		return
+	}
+	count := 0
+	nowNs := time.Now().UnixNano()
+	tillNextSec := 1000000000 - nowNs%1000000000
+	time.Sleep(time.Nanosecond * time.Duration(tillNextSec))
+	tck := time.NewTicker(time.Second)
+	for range tck.C {
+		url := "http://localhost:7971/gigapi/write"
+		data := `weather,location=us-midwest,season=summer temperature=82 1748253664000000000
+weather,location=us-midwest,season=summer temperature=83 1748253664000000000
+weather,location=us-midwest,season2=summer2 temperature=84 1748253664000000000
+weather,location=us-midwest,season2=summer2 temperature=84 1748253664000000000`
+
+		req, err := http.NewRequest("POST", url, bytes.NewBufferString(data))
+		if err != nil {
+			t.Fatal("error creating request: ", err)
+		}
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal("error sending request: ", err)
+		}
+		defer resp.Body.Close()
+
+		_, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal("error reading response: ", err)
+		}
+		count += 4
+		fmt.Printf("Total rows: %d\n", count)
+	}
+
+}
+
 func TestMetadataFiles(t *testing.T) {
+	if os.Getenv("INTERNAL_TEST") != "1" {
+		return
+	}
 	// Start CPU profiling
 	stopCPUProfile := startCPUProfile(t)
 	defer stopCPUProfile()
