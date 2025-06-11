@@ -7,8 +7,6 @@ import (
 	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/gigapi/metadata"
 	"os"
-	path2 "path"
-	"strings"
 	"time"
 )
 
@@ -81,12 +79,7 @@ func (d *dropService) dropOne() (bool, error) {
 }
 
 func (d *dropService) dropOneFs(plan metadata.DropPlan) error {
-	path := path2.Join(
-		strings.TrimPrefix(d.layer.URL, "file://"),
-		d.database,
-		d.table,
-		"data",
-		plan.Path)
+	path := buildPath(d.layer, d.t, "data")
 	os.Remove(path)
 	return nil
 }

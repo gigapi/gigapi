@@ -11,7 +11,6 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
-	"strings"
 	"time"
 )
 
@@ -96,18 +95,8 @@ func (m *moveService) moveOne() (bool, error) {
 
 func (m *moveService) doMoveFs2Fs(plan metadata.MovePlan, layerTo config.LayersConfiguration) error {
 
-	pathFrom := path.Join(
-		strings.TrimPrefix(m.layer.URL, "file://"),
-		m.database,
-		m.table,
-		"data",
-		plan.PathFrom)
-	pathTo := path.Join(
-		strings.TrimPrefix(layerTo.URL, "file://"),
-		m.database,
-		m.table,
-		"data",
-		plan.PathTo)
+	pathFrom := path.Join(buildPath(m.layer, m.t, "data"), plan.PathFrom)
+	pathTo := path.Join(buildPath(layerTo, m.t, "data"), plan.PathTo)
 
 	fmt.Printf("Moving %s to %s\n", pathFrom, pathTo)
 
@@ -139,11 +128,7 @@ func (m *moveService) doMoveFs2Fs(plan metadata.MovePlan, layerTo config.LayersC
 }
 
 func (m *moveService) doRemoveFs(plan metadata.MovePlan) error {
-	pathFrom := path.Join(
-		strings.TrimPrefix(m.layer.URL, "file://"),
-		m.database,
-		m.table,
-		plan.PathFrom)
+	pathFrom := path.Join(buildPath(m.layer, m.t, "data"), plan.PathFrom)
 	fmt.Printf("Removing %s\n", pathFrom)
 	return os.Remove(pathFrom)
 }

@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/ast"
@@ -15,7 +14,6 @@ import (
 	"github.com/gigapi/metadata"
 	"github.com/go-faster/city"
 	"golang.org/x/sync/errgroup"
-	"io/fs"
 	"math"
 	"os"
 	"path"
@@ -206,99 +204,6 @@ func NewHiveMergeTreeService(t *shared.Table) (*HiveMergeTreeService, error) {
 	//err := res.parsePartitionInfo()
 	return res, nil
 }
-
-func (h *HiveMergeTreeService) discoverPartitions() error {
-	for _, l := range config.Config.Gigapi.Layers {
-		err := h.discoverPartitionsByLayer(l)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (h *HiveMergeTreeService) discoverPartitionsByLayer(l config.LayersConfiguration) error {
-	if h.partitions[l.Name] == nil {
-		h.partitions[l.Name] = make(map[uint64]*Partition)
-	}
-	tablePath := filepath.Join(strings.TrimPrefix(l.URL, "file://"), h.Table.Path)
-	os.MkdirAll(tablePath, 0o755)
-	lastSuffix := fmt.Sprintf(".%d.parquet", MERGE_ITERATIONS+1)
-	err := filepath.Walk(tablePath, func(p string, info fs.FileInfo, err error) error {
-		if !info.IsDir() {
-			return nil
-		}
-		_, err = os.Stat(path.Join(p, "metadata.json"))
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-
-		isLivePartition := false
-		entries, err := os.ReadDir(p)
-		if err != nil {
-			return err
-		}
-		for _, entry := range entries {
-			if strings.HasSuffix(entry.Name(), ".parquet") &&
-				!strings.HasSuffix(entry.Name(), lastSuffix) {
-				isLivePartition = true
-			}
-		}
-
-		strPartitionPath := strings.TrimPrefix(p, filepath.Join(h.Table.Path, "data")+string(os.PathSeparator))
-		if !isLivePartition {
-			return filepath.SkipDir
-		}
-		arrPartitionPath := strings.Split(strPartitionPath, string(filepath.Separator))
-		values := make([][2]string, 0, len(arrPartitionPath))
-		for _, p := range arrPartitionPath {
-			kv := strings.SplitN(p, "=", 2)
-			if len(kv) < 2 {
-				fmt.Println("Invalid partition path: " + strPartitionPath)
-				return nil
-			}
-			values = append(values, [2]string{kv[0], kv[1]})
-		}
-		id := h.calculatePartitionHash(values)
-		if _, ok := h.partitions[l.Name][id]; !ok {
-			h.partitions[l.Name][id], err = NewPartition(values,
-				buildPath(l, h.Table, "tmp"),
-				buildPath(l, h.Table, "data"),
-				h.getPartPath(values),
-				h.Table)
-			if err != nil {
-				return err
-			}
-		}
-		return filepath.SkipDir
-	})
-	return err
-}
-
-/*func (h *HiveMergeTreeService) parsePartitionInfo() error {
-	h.partitionExressions = make([]*vm.Program, len(h.Table.PartitionBy))
-	idents := make(map[string]bool)
-
-	for i, partition := range h.Table.PartitionBy {
-		prog, identifiers, err := h.parsePartitionExpression(partition)
-		if err != nil {
-			return err
-		}
-		h.partitionExressions[i] = prog
-		for _, id := range identifiers {
-			idents[id] = true
-		}
-	}
-
-	h.requiredColumns = make([]string, 0, len(idents))
-	for id := range idents {
-		h.requiredColumns = append(h.requiredColumns, id)
-	}
-	return nil
-}*/
 
 type ExprParserHelper struct {
 	Identifiers []string
