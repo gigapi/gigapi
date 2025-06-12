@@ -53,7 +53,7 @@ func (s *s3SavePerformer) moveTmp(tmpPath string, filePath string) error {
 	return err
 }
 
-func (s *s3SavePerformer) join(part ...string) string {
+func (s *s3SavePerformer) Join(part ...string) string {
 	return strings.Join(part, "/")
 }
 
@@ -62,7 +62,7 @@ func (s *s3SavePerformer) base(path string) string {
 	return parts[len(parts)-1]
 }
 
-func (s *s3SavePerformer) sizeB(path string) (int64, error) {
+func (s *s3SavePerformer) SizeB(path string) (int64, error) {
 	minioClient, err := minio.New(s.desc.hostname, &minio.Options{
 		Creds:  credentials.NewStaticV4(s.desc.apiKey, s.desc.apiSecret, ""),
 		Secure: s.desc.secure, // Set to false if you're not using HTTPS
@@ -80,4 +80,8 @@ func (s *s3SavePerformer) sizeB(path string) (int64, error) {
 		return 0, fmt.Errorf("failed to get object size: %w", err)
 	}
 	return stat.Size, nil
+}
+
+func (s *s3SavePerformer) MkDirAll(part ...string) error {
+	return nil
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/gigapi/gigapi-config/config"
 	"github.com/gigapi/gigapi/v2/merge/data_types"
 	"github.com/gigapi/gigapi/v2/merge/shared"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -24,22 +25,24 @@ type saveService interface {
 	Save(fields []fieldDesc, unorderedData dataStore, relPath string) error
 	Join(part ...string) string
 	SizeB(relPath string) (int64, error)
+	MkDirAll(path ...string) error
 }
 
 type savePerformer interface {
 	moveTmp(tmpPath string, filePath string) error
-	join(part ...string) string
+	Join(part ...string) string
 	base(path string) string
-	sizeB(path string) (int64, error)
+	SizeB(path string) (int64, error)
+	MkDirAll(path ...string) error
 }
 
 type saveServiceManager struct {
-	table         *shared.Table
-	layer         config.LayersConfiguration
-	tmpPath       string
-	recordBatch   *array.RecordBuilder
-	schema        *arrow.Schema
-	savePerformer savePerformer
+	table       *shared.Table
+	layer       config.LayersConfiguration
+	tmpPath     string
+	recordBatch *array.RecordBuilder
+	schema      *arrow.Schema
+	savePerformer
 }
 
 func newFsSaveService(layer config.LayersConfiguration, table *shared.Table) (*saveServiceManager, error) {
@@ -48,6 +51,7 @@ func newFsSaveService(layer config.LayersConfiguration, table *shared.Table) (*s
 	if err != nil {
 		return nil, err
 	}
+	os.MkdirAll(dataPath, 0755)
 	res := &saveServiceManager{
 		table:   table,
 		layer:   layer,
@@ -135,21 +139,17 @@ func (fs *saveServiceManager) Save(fields []fieldDesc, unorderedData dataStore, 
 	return fs.savePerformer.moveTmp(tmpPath, relPath)
 }
 
-func (fs *saveServiceManager) Join(part ...string) string {
-	return fs.savePerformer.join(part...)
-}
-
-func (fs *saveServiceManager) SizeB(relPath string) (int64, error) {
-	return fs.savePerformer.sizeB(relPath)
-}
-
 type fsSavePerformer struct {
 	layer    config.LayersConfiguration
 	table    *shared.Table
 	dataPath string
 }
 
-func (f *fsSavePerformer) join(part ...string) string {
+func (f *fsSavePerformer) MkDirAll(part ...string) error {
+	return os.MkdirAll(filepath.Join(f.dataPath, f.Join(part...)), 0755)
+}
+
+func (f *fsSavePerformer) Join(part ...string) string {
 	return filepath.Join(part...)
 }
 func (f *fsSavePerformer) base(path string) string {
@@ -159,10 +159,30 @@ func (f *fsSavePerformer) base(path string) string {
 func (f *fsSavePerformer) moveTmp(tmpPath string, filePath string) error {
 	to := filepath.Join(f.dataPath, filePath)
 	err := os.Rename(tmpPath, to)
+	if err != nil {
+		err = f.moveTmpFallback(tmpPath, filePath)
+	}
 	return err
 }
 
-func (f *fsSavePerformer) sizeB(path string) (int64, error) {
+func (f *fsSavePerformer) moveTmpFallback(tmpPath string, filePath string) error {
+	to := filepath.Join(f.dataPath, filePath)
+	defer os.Remove(tmpPath)
+	from, err := os.Open(tmpPath)
+	if err != nil {
+		return err
+	}
+	defer from.Close()
+	fileTo, err := os.Create(to)
+	if err != nil {
+		return err
+	}
+	defer fileTo.Close()
+	_, err = io.Copy(fileTo, from)
+	return err
+}
+
+func (f *fsSavePerformer) SizeB(path string) (int64, error) {
 	info, err := os.Stat(filepath.Join(f.dataPath, path))
 	if err != nil {
 		return 0, err

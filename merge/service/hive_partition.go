@@ -55,6 +55,10 @@ func (p *Partition) initServices(t *shared.Table, layer config.LayersConfigurati
 	case "s3":
 		p.saveService, err = newS3SaveService(layer, t)
 	}
+	if err != nil {
+		return err
+	}
+	err = p.saveService.MkDirAll(p.partPath...)
 	return err
 }
 
@@ -118,6 +122,7 @@ func (p *Partition) Save() {
 	//TODO: remove the logic of dynamic schema
 	err := p.saveService.Save(mergeColumns(unordered), unordered, relPath)
 	if err != nil {
+		fmt.Println("Failed to save data to", relPath, ":", err)
 		onErr(err)
 		return
 	}

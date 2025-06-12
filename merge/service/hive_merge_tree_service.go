@@ -360,18 +360,8 @@ func (h *HiveMergeTreeService) Store(columns map[string]any) utils.Promise[int32
 	for _, part := range partsDesc {
 		id := h.calculatePartitionHash(part.Values)
 		if _, ok := h.partitions[config.Config.Gigapi.Layers[0].Name][id]; !ok {
-			tmpPath, err := buildPath(config.Config.Gigapi.Layers[0], h.Table, "tmp")
-			if err != nil {
-				return utils.Fulfilled[int32](err, 0)
-			}
-			dataPath, err := buildPath(config.Config.Gigapi.Layers[0], h.Table, "data")
-			if err != nil {
-				return utils.Fulfilled[int32](err, 0)
-			}
 			h.partitions[config.Config.Gigapi.Layers[0].Name][id], err = NewPartition(part.Values,
-				tmpPath,
-				dataPath,
-				h.getPartPath(part.Values),
+				config.Config.Gigapi.Layers[0],
 				h.Table)
 			if err != nil {
 				h.mtx.Unlock()

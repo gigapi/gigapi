@@ -49,7 +49,7 @@ var firstIterationSemaphore = semaphore.NewWeighted(1)
 func (f *mergeServiceManager) merge(p metadata.MergePlan) error {
 	var err error
 	if p.Iteration == 1 {
-		return f.mergeServicePerformer.mergeFirstIteration(p)
+		err = f.mergeServicePerformer.mergeFirstIteration(p)
 	} else if len(p.From) == 1 {
 		err = f.mergeServicePerformer.mergeOne(p)
 	} else {
