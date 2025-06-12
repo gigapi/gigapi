@@ -41,28 +41,36 @@ services:
       - "7971:7971"
     environment:
       - GIGAPI_ROOT=/data
+      - GIGAPI_LAYER_0_NAME=default
+      - GIGAPI_LAYER_0_TYPE=fs
+      - GIGAPI_LAYER_0_URL=file:///data
 ```
 ### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=18 /> Settings
 
-| Env Var Name             | Description                                                  | Default Value |
-|--------------------------|--------------------------------------------------------------|---------------|
-| `GIGAPI_ROOT`              | Root folder for all the data files                         |               |
-| `GIGAPI_MERGE_TIMEOUT_S`   | Base timeout between merges (in seconds)                   | `10`            |
-| `GIGAPI_SAVE_TIMEOUT_S`    | Timeout before saving the new data to the disk (in seconds)| `1`             |
-| `GIGAPI_NO_MERGES`         | Disable merging                                            | `false`         |
-| `GIGAPI_UI`                | Enable UI for querier                                      | `true`          |
-| `GIGAPI_MODE`              | Execution mode (`readonly`, `writeonly`, `compaction`, `aio`) | `"aio"`      |
-| `GIGAPI_METADATA_TYPE`     | Metadata Type (`json` for local, `redis` for distributed)  | `"json"`    |
-| `GIGAPI_METADATA_URL`      | Metadata Type URL for redis (ie: `redis://redis:6379/0`    |             |
-| `HTTP_PORT`                | Port to listen on for HTTP server                          | `7971`      |
-| `HTTP_HOST`                | Host to bind to for HTTP server                            | `"0.0.0.0"` |
-| `HTTP_BASIC_AUTH_USERNAME` | Username for HTTP basic authentication                     |             |
-| `HTTP_BASIC_AUTH_PASSWORD` | Password for HTTP basic authentication                     |             |
-| `FLIGHTSQL_PORT`           | Port to run FlightSQL server                               | `8082`      |
-| `FLIGHTSQL_ENABLE`         | Enable FlightSQL server                                    | `true`      |
-| `LOGLEVEL`                 | Log level (debug, info, warn, error, fatal)                | `"info"`    |
-| `DUCKDB_MEM_LIMIT`         | DuckDB memory limit (e.g. 1GB)                             | `"1GB"`     |
-| `DUCKDB_THREAD_LIMIT`      | DuckDB thread limit (int)                                  | `1`         |
+| Env Var Name               | Description                                                         | Default Value |
+|----------------------------|---------------------------------------------------------------------|---------------|
+| `GIGAPI_ROOT`              | Root folder for all the data files                                  |               |
+| `GIGAPI_MERGE_TIMEOUT_S`   | Base timeout between merges (in seconds)                            | `10`          |
+| `GIGAPI_SAVE_TIMEOUT_S`    | Timeout before saving the new data to the disk (in seconds)         | `1`           |
+| `GIGAPI_NO_MERGES`         | Disable merging                                                     | `false`       |
+| `GIGAPI_UI`                | Enable UI for querier                                               | `true`        |
+| `GIGAPI_MODE`              | Execution mode (`readonly`, `writeonly`, `compaction`, `aio`)       | `"aio"`       |
+| `GIGAPI_METADATA_TYPE`     | Metadata Type (`json` for local, `redis` for distributed)           | `"json"`      |
+| `GIGAPI_METADATA_URL`      | Metadata Type URL for redis (ie: `redis://redis:6379/0`             |               |
+| `HTTP_PORT`                | Port to listen on for HTTP server                                   | `7971`        |
+| `HTTP_HOST`                | Host to bind to for HTTP server                                     | `"0.0.0.0"`   |
+| `HTTP_BASIC_AUTH_USERNAME` | Username for HTTP basic authentication                              |               |
+| `HTTP_BASIC_AUTH_PASSWORD` | Password for HTTP basic authentication                              |               |
+| `FLIGHTSQL_PORT`           | Port to run FlightSQL server                                        | `8082`        |
+| `FLIGHTSQL_ENABLE`         | Enable FlightSQL server                                             | `true`        |
+| `LOGLEVEL`                 | Log level (debug, info, warn, error, fatal)                         | `"info"`      |
+| `DUCKDB_MEM_LIMIT`         | DuckDB memory limit (e.g. 1GB)                                      | `"1GB"`       |
+| `DUCKDB_THREAD_LIMIT`      | DuckDB thread limit (int)                                           | `1`           |
+| `GIGAPI_LAYER_X_NAME`      | X - layer index from 0. Layer unique name.                          |               |
+| `GIGAPI_LAYER_X_TYPE`      | `fs` for file system, `s3` for s3                                   |               |
+| `GIGAPI_LAYER_X_GLOBAL`    | `true` if all the cluster has an access to the layer                |               |
+| `GIGAPI_LAYER_X_URL`       | path or url to s3                                                   |               |
+| `GIGAPI_LAYER_X_TTL`       | timeout before send data to the next layer or drop it 0 for no drop | `0`           |
 
 > You can override the defaults by setting these environment variables before starting the service.
 
@@ -166,6 +174,71 @@ GigAPI can be used from Grafana using the InfluxDB3 Flight GRPC Datasource
 > GigAPI readers can be implemented in any language and with any OLAP engine supporting Parquet files.
 
 <br>
+
+#### Layer support
+
+GigAPI employs a "data layer" concept for efficient data storage and management. 
+A "data layer" represents a storage location, which can be either a file system or an 
+S3 bucket, where data is stored for a specified duration. 
+Data within a layer undergoes merging operations and can be transferred between layers based on 
+Time-to-Live (TTL) configurations.
+
+##### Layers configuration
+
+Layer configuration should be consistent across all readers and writers in the cluster. 
+Layer names and paths must be identical throughout the cluster to ensure proper data access and management.
+
+The metadata, stored either in JSON format or Redis, contains only the layer name. 
+Each reader and writer determines the path to the parquet file based on this layer name.
+
+#### Layer Configuration Breakdown
+
+For each layer, the following parameters can be configured:
+
+- `NAME`: A unique identifier for the layer.
+- `TYPE`: The storage type (`fs` for file system, `s3` for S3 bucket).
+- `URL`: The path or URL to the storage location.
+- `GLOBAL`: Boolean indicating if the layer is accessible to all cluster nodes.
+- `TTL`: Time-to-Live duration before data moves to the next layer (use `0` for no expiration).
+
+Here's an example of layer configuration using environment variables:
+```bash
+# Local Storage, Fastest, 30 minutes TTL
+GIGAPI_LAYERS_0_NAME=cache
+GIGAPI_LAYERS_0_TYPE=fs
+GIGAPI_LAYERS_0_URL=file:///data
+GIGAPI_LAYERS_0_GLOBAL=false
+GIGAPI_LAYERS_0_TTL=30m
+
+# Remote Layer 1, Fast-enough, 4 weeks TTL
+GIGAPI_LAYERS_1_NAME=s3
+GIGAPI_LAYERS_1_TYPE=s3
+GIGAPI_LAYERS_1_URL=s3://api_key:api_secret@s3.server.hostname/bucket/prefix/to/layer
+GIGAPI_LAYERS_1_GLOBAL=true
+GIGAPI_LAYERS_1_TTL=4w
+
+# Remote Layer 2, Slower, forever TTL
+GIGAPI_LAYERS_2_NAME=r2
+GIGAPI_LAYERS_2_TYPE=r2
+GIGAPI_LAYERS_2_URL=s3://api_key:api_secret@r2.server.hostname/bucket/prefix/to/layer
+GIGAPI_LAYERS_2_GLOBAL=true
+GIGAPI_LAYERS_2_TTL=0
+```
+
+In this configuration:
+
+1. The first layer (`GIGAPI_LAYERS_0_*`) is a local cache:
+    - It uses the file system (`fs`) as the storage type.
+    - Data is stored locally and is not globally accessible (`GLOBAL=false`).
+    - Data remains in this layer for 10 seconds before moving to the next layer (`TTL=10s`).
+
+2. The second layer (`GIGAPI_LAYERS_1_*`) is an S3 bucket:
+    - It uses S3 as the storage type.
+    - Data is globally accessible to all cluster nodes (`GLOBAL=true`).
+    - Data remains in this layer indefinitely (`TTL=0`).
+
+> [!NOTE]
+> The s3 layer type is currently under development.
 
 ## <img src="https://github.com/user-attachments/assets/74a1fa93-5e7e-476d-93cb-be565eca4a59" height=20 />  GigAPI Diagram
 
