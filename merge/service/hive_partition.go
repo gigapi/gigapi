@@ -1,13 +1,13 @@
 package service
 
 import (
+	"fmt"
 	"github.com/gigapi/gigapi-config/config"
 	"github.com/gigapi/gigapi/v2/merge/data_types"
 	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/gigapi/gigapi/v2/utils"
 	"github.com/gigapi/metadata"
-	"os"
-	"path/filepath"
+	"github.com/google/uuid"
 	"sync"
 	"time"
 )
@@ -23,42 +23,39 @@ type Partition struct {
 	lastStore         time.Time
 	lastSave          time.Time
 	lastIterationTime [MERGE_ITERATIONS]time.Time
-	dataPath          string
-	partPath          string
+	partPath          []string
+	layer             config.LayersConfiguration
 }
 
-func NewPartition(values [][2]string, tmpPath, dataPath, partPath string, t *shared.Table) (*Partition, error) {
+func NewPartition(values [][2]string, layer config.LayersConfiguration, t *shared.Table) (*Partition, error) {
+	var partPath []string
+	for _, v := range values {
+		partPath = append(partPath, fmt.Sprintf("%s=%s", v[0], v[1]))
+	}
 	res := &Partition{
 		Values:    values,
 		unordered: newUnorderedDataStore(),
 		table:     t,
-		dataPath:  dataPath,
 		partPath:  partPath,
+		layer:     layer,
 	}
 	for i := range res.lastIterationTime {
 		res.lastIterationTime[i] = time.Now()
 	}
 	res.index = t.Index
-	err := res.initServices(tmpPath, dataPath, t)
+	err := res.initServices(t, layer)
 	return res, err
 }
 
-func (p *Partition) initServices(tmpPath, dataPath string, t *shared.Table) error {
-	err := os.MkdirAll(tmpPath, 0755)
-	if err != nil {
-		return err
+func (p *Partition) initServices(t *shared.Table, layer config.LayersConfiguration) error {
+	var err error
+	switch layer.Type {
+	case "fs":
+		p.saveService, err = newFsSaveService(layer, t)
+	case "s3":
+		p.saveService, err = newS3SaveService(layer, t)
 	}
-	err = os.MkdirAll(filepath.Join(dataPath, p.partPath), 0755)
-	if err != nil {
-		return err
-	}
-
-	p.saveService = &fsSaveService{
-		dataPath: dataPath,
-		tmpPath:  tmpPath,
-		partPath: p.partPath,
-	}
-	return nil
+	return err
 }
 
 func (p *Partition) GetSchema() map[string]string {
@@ -115,8 +112,11 @@ func (p *Partition) Save() {
 	if len(promises) == 0 {
 		return
 	}
+	fname := uuid.New().String() + ".1.parquet"
+	relPath := p.saveService.Join(append(p.partPath, fname)...)
+
 	//TODO: remove the logic of dynamic schema
-	fName, err := p.saveService.Save(mergeColumns(unordered), unordered)
+	err := p.saveService.Save(mergeColumns(unordered), unordered, relPath)
 	if err != nil {
 		onErr(err)
 		return
@@ -129,22 +129,21 @@ func (p *Partition) Save() {
 	}
 
 	if p.index != nil {
-		absDataPath := filepath.Join(p.dataPath, fName)
-		stat, err := os.Stat(absDataPath)
+		size, err := p.saveService.SizeB(relPath)
 		if err != nil {
 			onErr(err)
 			return
 		}
 
-		size := unordered.GetSize()
+		rows := unordered.GetSize()
 
 		prom := p.index.Batch([]*metadata.IndexEntry{{
 			Layer:     config.Config.Gigapi.Layers[0].Name,
 			Database:  p.table.Database,
 			Table:     p.table.Name,
-			Path:      fName,
-			SizeBytes: stat.Size(),
-			RowCount:  size,
+			Path:      relPath,
+			SizeBytes: size,
+			RowCount:  rows,
 			ChunkTime: time.Now().UnixNano(),
 			Min:       nil,
 			Max:       nil,

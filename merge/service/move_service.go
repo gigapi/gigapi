@@ -6,11 +6,14 @@ import (
 	"github.com/gigapi/gigapi-config/config"
 	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/gigapi/metadata"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -22,6 +25,7 @@ type moveService struct {
 	cancel   context.CancelFunc
 	t        *shared.Table
 	writerId string
+	tmpPath  string
 }
 
 func (m *moveService) Run() {
@@ -78,12 +82,22 @@ func (m *moveService) moveOne() (bool, error) {
 		layerTo = config.Config.Gigapi.Layers[layerFromIdx+1]
 	}
 
-	if m.layer.Type == "fs" && layerTo.Name == "" {
-		err = m.doRemoveFs(plan)
-	} else if m.layer.Type == "fs" && layerTo.Type == "fs" {
+	switch m.layer.Type + layerTo.Type {
+	case "fsfs":
 		err = m.doMoveFs2Fs(plan, layerTo)
-	} else {
-		err = fmt.Errorf("unsupported move from %s to %s", m.layer.Type, layerTo.Type)
+	case "fss3":
+		err = m.doMoveFs2S3(plan, layerTo)
+	case "s3fs":
+		err = m.doMoveS32Fs(plan, layerTo)
+	case "s3s3":
+		err = m.doMoveS32S3(plan, layerTo)
+	case "fs":
+		err = m.doRemoveFs(plan)
+	case "s3":
+		err = m.doRemoveS3(plan)
+	default:
+		return false, fmt.Errorf("unsupported move from %s to %s", m.layer.Type, layerTo.Type)
+
 	}
 	if err != nil {
 		return false, err
@@ -133,6 +147,123 @@ func (m *moveService) doMoveFs2Fs(plan metadata.MovePlan, layerTo config.LayersC
 	return err
 }
 
+func (m *moveService) doMoveFs2S3(plan metadata.MovePlan, layerTo config.LayersConfiguration) error {
+	desc, err := parseS3Url(layerTo.URL)
+	if err != nil {
+		return err
+	}
+
+	minioClient, err := minio.New(desc.hostname, &minio.Options{
+		Creds:  credentials.NewStaticV4(desc.apiKey, desc.apiSecret, ""),
+		Secure: desc.secure,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create MinIO client: %w", err)
+	}
+
+	pathFrom, err := buildPath(m.layer, m.t, path.Join("data", plan.PathFrom))
+	if err != nil {
+		return err
+	}
+	path := desc.path
+	if path != "" {
+		path += "/"
+	}
+	keyTo := fmt.Sprintf("%s%s/%s/%s", path, m.database, m.table, plan.PathTo)
+
+	_, err = minioClient.FPutObject(context.Background(), desc.bucket, keyTo, pathFrom, minio.PutObjectOptions{})
+	return err
+}
+
+func (m *moveService) doMoveS32Fs(plan metadata.MovePlan, layerTo config.LayersConfiguration) error {
+	desc, err := parseS3Url(m.layer.URL)
+	if err != nil {
+		return err
+	}
+
+	minioClient, err := minio.New(desc.hostname, &minio.Options{
+		Creds:  credentials.NewStaticV4(desc.apiKey, desc.apiSecret, ""),
+		Secure: desc.secure,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create MinIO client: %w", err)
+	}
+
+	pathFrom := desc.path
+	if pathFrom != "" {
+		pathFrom += "/"
+	}
+	keyFrom := fmt.Sprintf("%s%s/%s/%s", pathFrom, m.database, m.table, plan.PathTo)
+
+	toFilename := filepath.Base(plan.PathTo)
+	tmpPath := filepath.Join(m.tmpPath, toFilename)
+	pathTo, err := buildPath(layerTo, m.t, path.Join("data", plan.PathFrom))
+	if err != nil {
+		return err
+	}
+
+	err = minioClient.FGetObject(context.Background(), desc.bucket, keyFrom, tmpPath, minio.GetObjectOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to download file from S3: %w", err)
+	}
+
+	err = os.Rename(tmpPath, pathTo)
+	return err
+}
+
+func (m *moveService) doMoveS32S3(plan metadata.MovePlan, layerTo config.LayersConfiguration) error {
+	descFrom, err := parseS3Url(m.layer.URL)
+	if err != nil {
+		return err
+	}
+
+	minioClient, err := minio.New(descFrom.hostname, &minio.Options{
+		Creds:  credentials.NewStaticV4(descFrom.apiKey, descFrom.apiSecret, ""),
+		Secure: descFrom.secure,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create MinIO client: %w", err)
+	}
+
+	pathFrom := descFrom.path
+	if pathFrom != "" {
+		pathFrom += "/"
+	}
+	keyFrom := fmt.Sprintf("%s%s/%s/%s", pathFrom, m.database, m.table, plan.PathTo)
+
+	toParts := strings.Split(layerTo.URL, "/")
+	toFilename := toParts[len(toParts)-1]
+	tmpPath := filepath.Join(m.tmpPath, toFilename)
+
+	pathTo := descFrom.path
+	if pathFrom != "" {
+		pathTo += "/"
+	}
+	keyTo := fmt.Sprintf("%s%s/%s/%s", pathTo, m.database, m.table, plan.PathTo)
+	if err != nil {
+		return err
+	}
+
+	err = minioClient.FGetObject(context.Background(), descFrom.bucket, keyFrom, tmpPath, minio.GetObjectOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to download file from S3: %w", err)
+	}
+
+	descTo, err := parseS3Url(layerTo.URL)
+	if err != nil {
+		return err
+	}
+	minioClient, err = minio.New(descTo.hostname, &minio.Options{
+		Creds:  credentials.NewStaticV4(descTo.apiKey, descTo.apiSecret, ""),
+		Secure: descTo.secure,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create MinIO client: %w", err)
+	}
+	_, err = minioClient.FPutObject(context.Background(), descTo.bucket, keyTo, tmpPath, minio.PutObjectOptions{})
+	return err
+}
+
 func (m *moveService) doRemoveFs(plan metadata.MovePlan) error {
 	pathFrom, err := buildPath(m.layer, m.t, path.Join("data", plan.PathFrom))
 	if err != nil {
@@ -140,4 +271,28 @@ func (m *moveService) doRemoveFs(plan metadata.MovePlan) error {
 	}
 	fmt.Printf("Removing %s\n", pathFrom)
 	return os.Remove(pathFrom)
+}
+
+func (m *moveService) doRemoveS3(plan metadata.MovePlan) error {
+	descFrom, err := parseS3Url(m.layer.URL)
+	if err != nil {
+		return err
+	}
+
+	minioClient, err := minio.New(descFrom.hostname, &minio.Options{
+		Creds:  credentials.NewStaticV4(descFrom.apiKey, descFrom.apiSecret, ""),
+		Secure: descFrom.secure,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create MinIO client: %w", err)
+	}
+
+	pathFrom := descFrom.path
+	if pathFrom != "" {
+		pathFrom += "/"
+	}
+	keyFrom := fmt.Sprintf("%s%s/%s/%s", pathFrom, m.database, m.table, plan.PathTo)
+
+	err = minioClient.RemoveObject(context.Background(), descFrom.bucket, keyFrom, minio.RemoveObjectOptions{})
+	return err
 }

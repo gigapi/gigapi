@@ -201,9 +201,9 @@ func TestConsistency(t *testing.T) {
 	for range tck.C {
 		url := "http://localhost:7971/gigapi/write"
 		data := `weather,location=us-midwest,season=summer temperature=82 1748253664000000000
-weather,location=us-midwest,season=summer temperature=83 1748253664000000000
-weather,location=us-midwest,season2=summer2 temperature=84 1748253664000000000
-weather,location=us-midwest,season2=summer2 temperature=84 1748253664000000000`
+weather,location=us-midwest,season=summer temperature=83
+weather,location=us-midwest,season2=summer2 temperature=84
+weather,location=us-midwest,season2=summer2 temperature=84`
 
 		req, err := http.NewRequest("POST", url, bytes.NewBufferString(data))
 		if err != nil {
