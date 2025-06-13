@@ -24,8 +24,6 @@ jobs:
         env:
           MINIO_ROOT_USER: minioadmin
           MINIO_ROOT_PASSWORD: minioadmin
-          MINIO_ACCESS_KEY: minioadmin
-          MINIO_SECRET_KEY: minioadmin
 
     steps:
     - name: Checkout code
@@ -80,7 +78,7 @@ jobs:
         GIGAPI_LAYERS_0_NAME: default
         GIGAPI_LAYERS_0_TYPE: fs
         GIGAPI_LAYERS_0_URL: "file:///data"
-        GIGAPI_LAYERS_0_TTL: 10s
+        GIGAPI_LAYERS_0_TTL: 30s
         GIGAPI_LAYERS_1_NAME: s3
         GIGAPI_LAYERS_1_TYPE: s3
         GIGAPI_LAYERS_1_TTL: 0
