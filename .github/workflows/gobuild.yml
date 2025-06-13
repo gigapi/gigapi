@@ -16,6 +16,13 @@ jobs:
         image: redis:alpine
         ports:
           - 6379:6379
+      minio:
+        image: quay.io/minio/minio:latest
+        ports:
+          - 9000:9000
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
 
     steps:
     - name: Checkout code
@@ -27,19 +34,57 @@ jobs:
         go-version: '1.24'
         cache: true
 
-    - name: Build
+    - name: Build GigAPI AIO
       run: |
         go mod tidy
         CGO_ENABLED=1 go build -o gigapi .
 
-    - name: Run tests
-      continue-on-error: true
+    - name: Run tests (local)
+      continue-on-error: false
       run: |
         mkdir -p ./data
         go test -v ./...
       env:
-        GIGAPI_ROOT: ./data
+        GIGAPI_ROOT: "/data"
+        GIGAPI_LAYERS_0_NAME: default
+        GIGAPI_LAYERS_0_TYPE: fs
+        GIGAPI_LAYERS_0_URL: "file:///data"
         GIGAPI_ENABLED: true
         GIGAPI_MERGE_TIMEOUT_S: 10
-#        GIGAPI_METADATA_TYPE: redis
-#        GIGAPI_METADATA_URL: redis://localhost:6379/0 
+        
+    - name: Run tests (redis)
+      continue-on-error: false
+      run: |
+        mkdir -p ./data-redis
+        go test -v ./...
+      env:
+        GIGAPI_ROOT: "/data-redis"
+        GIGAPI_LAYERS_0_NAME: default
+        GIGAPI_LAYERS_0_TYPE: fs
+        GIGAPI_LAYERS_0_URL: "file:///data"
+        GIGAPI_ENABLED: true
+        GIGAPI_MERGE_TIMEOUT_S: 10
+        GIGAPI_METADATA_TYPE: redis
+        GIGAPI_METADATA_URL: redis://localhost:6379/0 
+        
+    - name: Run tests (redis + minio)
+      continue-on-error: false
+      run: |
+        mkdir -p ./data-minio
+        go test -v ./...
+      env:
+        GIGAPI_ROOT: "/data-minio"
+        GIGAPI_LAYERS_0_NAME: default
+        GIGAPI_LAYERS_0_TYPE: fs
+        GIGAPI_LAYERS_0_URL: "file:///data"
+        GIGAPI_LAYERS_0_TTL: 10s
+        GIGAPI_LAYERS_1_NAME: s3
+        GIGAPI_LAYERS_1_TYPE: s3
+        GIGAPI_LAYERS_1_TTL: 0
+        GIGAPI_LAYERS_1_URL: "s3://minio:9000/gigapi?secure=false&url-style=path"
+        GIGAPI_LAYERS_1_AUTH_KEY: minioadmin
+        GIGAPI_LAYERS_1_AUTH_SECRET: minioadmin
+        GIGAPI_ENABLED: true
+        GIGAPI_MERGE_TIMEOUT_S: 10
+        GIGAPI_METADATA_TYPE: redis
+        GIGAPI_METADATA_URL: redis://localhost:6379/0 
