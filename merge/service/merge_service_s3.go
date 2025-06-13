@@ -45,10 +45,8 @@ func parseS3Url(layer config.LayersConfiguration) (s3Desc, error) {
 	if len(pathParts) > 1 && pathParts[1] != "" {
 		res.path = pathParts[1]
 	}
-	if s3Url.User != nil {
-		res.apiKey = s3Url.User.Username()
-		res.apiSecret, _ = s3Url.User.Password()
-	}
+	res.apiKey = layer.Auth.Key
+	res.apiSecret = layer.Auth.Secret
 	res.secure = true
 	if s3Url.Query().Get("secure") == "false" {
 		res.secure = false

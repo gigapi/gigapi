@@ -40,10 +40,8 @@ github.com/frankban/quicktest v1.14.6 h1:7Xjx+VpznH+oBnejlPUj8oUpdxnVs4f8XU8WnHk
 github.com/frankban/quicktest v1.14.6/go.mod h1:4ptaffx2x8+WTWXmUCuVU6aPUX1/Mz7zb5vbUoiM6w0=
 github.com/fsnotify/fsnotify v1.7.0 h1:8JEhPFa5W2WU7YfeZzPNqzMP6Lwt7L2715Ggo0nosvA=
 github.com/fsnotify/fsnotify v1.7.0/go.mod h1:40Bi/Hjc2AVfZrqy+aj+yEI+/bRxZnMJyTJwOpGvigM=
-github.com/gigapi/gigapi-config v0.0.8 h1:fyOwS3by+qMlHLthmIgX1gXEchH2PUH2l4x/y9sRyOg=
-github.com/gigapi/gigapi-config v0.0.8/go.mod h1:/hD+d1odWyElSP9++ZPLULXthWHXvx0shNypdbZDYA8=
-github.com/gigapi/gigapi-querier v0.0.21 h1:OCUY/k4kZEmes/assnn/xb6T/3n021qk7tfUfva/LKY=
-github.com/gigapi/gigapi-querier v0.0.21/go.mod h1:/QPtfZ9EVzslAm5FpAZ0vLgu2DsjaU8ljop4Zs3KBdk=
+github.com/gigapi/gigapi-config v0.0.9 h1:7VWmMJb2dKGDReasOgu45bzOmrfj/WCiBcO9g4MNgXw=
+github.com/gigapi/gigapi-config v0.0.9/go.mod h1:/hD+d1odWyElSP9++ZPLULXthWHXvx0shNypdbZDYA8=
 github.com/gigapi/metadata v0.0.4 h1:kQdreAUyeguIrwSlPukzZ36Y9HlKVhcaBgrg8crK1tY=
 github.com/gigapi/metadata v0.0.4/go.mod h1:LGFPrq9868U3+4S5DdoL1/aU3Ua0mXsRVblXXzCK1i0=
 github.com/go-faster/city v1.0.1 h1:4WAxSZ3V2Ws4QRDrscLEDcibJY8uf41H6AhXDrNDcGw=

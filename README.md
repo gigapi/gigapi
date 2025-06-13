@@ -213,14 +213,18 @@ GIGAPI_LAYERS_0_TTL=30m
 # Remote Layer 1, Fast-enough, 4 weeks TTL
 GIGAPI_LAYERS_1_NAME=s3
 GIGAPI_LAYERS_1_TYPE=s3
-GIGAPI_LAYERS_1_URL=s3://api_key:api_secret@s3.server.hostname/bucket/prefix/to/layer
+GIGAPI_LAYERS_1_URL=s3://s3.server.hostname/bucket/prefix/to/layer
+GIGAPI_LAYERS_1_AUTH_KEY=api_key
+GIGAPI_LAYERS_1_AUTH_SECRET=api_secret
 GIGAPI_LAYERS_1_GLOBAL=true
 GIGAPI_LAYERS_1_TTL=4w
 
 # Remote Layer 2, Slower, forever TTL
-GIGAPI_LAYERS_2_NAME=r2
-GIGAPI_LAYERS_2_TYPE=r2
-GIGAPI_LAYERS_2_URL=s3://api_key:api_secret@r2.server.hostname/bucket/prefix/to/layer
+GIGAPI_LAYERS_2_NAME=s3
+GIGAPI_LAYERS_2_TYPE=s3
+GIGAPI_LAYERS_2_URL=s3://r2.server.hostname/bucket/prefix/to/layer
+GIGAPI_LAYERS_2_AUTH_KEY=api_key
+GIGAPI_LAYERS_2_AUTH_SECRET=api_secret
 GIGAPI_LAYERS_2_GLOBAL=true
 GIGAPI_LAYERS_2_TTL=0
 ```
@@ -242,13 +246,15 @@ In this configuration:
 GigAPI supports S3-compatible storage for data layers. The S3 URL format is as follows:
 
 ```
-s3://[access_key]:[secret_key]@[endpoint_url]/[bucket]/[path/to/base]?[parameters]
+s3://[endpoint_url]/[bucket]/[path/to/base]?[parameters]
 ```
+
+The access key and secret key are provided in separate env variables:
+- `GIGAPI_LAYERS_[X]_AUTH_KEY=api_key` - for access key
+- `GIGAPI_LAYERS_[X]_AUTH_SECRET=api_secret` - for secret key
 
 ### URL Components:
 
-- `access_key`: Your S3 access key
-- `secret_key`: Your S3 secret key
 - `endpoint_url`: The S3 endpoint URL (e.g., `s3.amazonaws.com` for AWS S3)
 - `bucket`: Your S3 bucket name
 - `path/to/base`: Optional path prefix within the bucket
@@ -264,17 +270,24 @@ s3://[access_key]:[secret_key]@[endpoint_url]/[bucket]/[path/to/base]?[parameter
 
 1. AWS S3:
 ```
-s3://AKIAIOSFODNN7EXAMPLE:EXAMPLEKEY@s3.amazonaws.com/my-bucket/data
+GIGAPI_LAYERS_X_URL=s3://s3.amazonaws.com/my-bucket/data
+GIGAPI_LAYERS_X_AUTH_KEY=AKIAIOSFODNN7EXAMPLE
+GIGAPI_LAYERS_X_AUTH_SECRET=EXAMPLEKEY
 ```
 
 2. Local MinIO server:
 ```
-s3://minioadmin:minioadmin@localhost:9000/gigapi?secure=false&url-style=path
+GIGAPI_LAYERS_X_URL=s3://localhost:9000/gigapi?secure=false&url-style=path
+GIGAPI_LAYERS_X_AUTH_KEY=minioadmin
+GIGAPI_LAYERS_X_AUTH_SECRET=minioadmin
+
 ```
 
 3. DigitalOcean Spaces:
 ```
-s3://DO00EXAMPLE1ACCESSKEY:DO00EXAMPLE1SECRETKEY@nyc3.digitaloceanspaces.com/my-space/data?url-style=path
+GIGAPI_LAYERS_X_URL=s3://DO00EXAMPLE1ACCESSKEY:DO00EXAMPLE1SECRETKEY@nyc3.digitaloceanspaces.com/my-space/data?url-style=path
+GIGAPI_LAYERS_X_AUTH_KEY=DO00EXAMPLE1ACCESSKEY
+GIGAPI_LAYERS_X_AUTH_SECRET=DO00EXAMPLE1SECRETKEY
 ```
 
 ### Security Considerations:
