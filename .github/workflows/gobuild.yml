@@ -17,12 +17,15 @@ jobs:
         ports:
           - 6379:6379
       minio:
-        image: quay.io/minio/minio:latest
+        image: bitnami/minio:latest
         ports:
           - 9000:9000
+        options: --name minio-server
         env:
           MINIO_ROOT_USER: minioadmin
           MINIO_ROOT_PASSWORD: minioadmin
+          MINIO_ACCESS_KEY: minioadmin
+          MINIO_SECRET_KEY: minioadmin
 
     steps:
     - name: Checkout code
