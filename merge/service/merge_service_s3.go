@@ -10,25 +10,27 @@ import (
 	"github.com/gigapi/metadata"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"golang.org/x/exp/rand"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
 type s3Desc struct {
+	layer     config.LayersConfiguration
 	hostname  string
 	bucket    string
 	path      string
 	apiKey    string
 	apiSecret string
 	secure    bool
+	urlStyle  string
 }
 
-func parseS3Url(s3URL string) (s3Desc, error) {
-	var res s3Desc
-	s3Url, err := url.Parse(s3URL)
+func parseS3Url(layer config.LayersConfiguration) (s3Desc, error) {
+	res := s3Desc{layer: layer}
+	s3Url, err := url.Parse(layer.URL)
 	if err != nil {
 		return res, err
 	}
@@ -38,7 +40,7 @@ func parseS3Url(s3URL string) (s3Desc, error) {
 	}
 
 	res.hostname = s3Url.Host
-	pathParts := strings.SplitN(s3Url.Path, "/", 2)
+	pathParts := strings.SplitN(strings.TrimPrefix(s3Url.Path, "/"), "/", 2)
 	res.bucket = pathParts[0]
 	if len(pathParts) > 1 && pathParts[1] != "" {
 		res.path = pathParts[1]
@@ -50,6 +52,10 @@ func parseS3Url(s3URL string) (s3Desc, error) {
 	res.secure = true
 	if s3Url.Query().Get("secure") == "false" {
 		res.secure = false
+	}
+	res.urlStyle = "vhost"
+	if s3Url.Query().Get("url-style") == "path" {
+		res.urlStyle = "path"
 	}
 	return res, nil
 }
@@ -71,7 +77,7 @@ func newS3MergeService(layer config.LayersConfiguration, table *shared.Table) (m
 		return nil, err
 	}
 
-	s3D, err := parseS3Url(layer.URL)
+	s3D, err := parseS3Url(layer)
 	if err != nil {
 		return nil, err
 	}
@@ -82,26 +88,32 @@ func newS3MergeService(layer config.LayersConfiguration, table *shared.Table) (m
 		desc:    s3D,
 	}
 
+	savePerf, err := newS3SavePerformer(layer, table)
+	if err != nil {
+		return nil, err
+	}
+
 	manager := &mergeServiceManager{
 		dataPath:              dataPath,
 		tmpPath:               tmpPath,
 		table:                 table,
 		index:                 table.Index,
 		mergeServicePerformer: performer,
+		savePerformer:         savePerf,
 	}
 	return manager, nil
 }
 
 func (s *s3MergeServicePerformer) getPaths(files []string) []string {
 	var res []string
-	path := s.desc.path
+	path := strings.Trim(s.desc.path, "/")
 	if path != "" {
 		path += "/"
 	}
 	for _, f := range files {
-		res = append(res, fmt.Sprintf("s3://%s/%s/%s%s/%s",
+		res = append(res, fmt.Sprintf("s3://%s/%s%s/%s/%s",
 			s.desc.bucket,
-			s.desc.path,
+			path,
 			s.table.Database,
 			s.table.Name,
 			f))
@@ -110,15 +122,19 @@ func (s *s3MergeServicePerformer) getPaths(files []string) []string {
 }
 
 func (s *s3MergeServicePerformer) createSecret(conn *sql.DB) (func(), error) {
-	secretName := fmt.Sprintf("secret_%d", rand.Uint64())
-	_, err := conn.Exec(fmt.Sprintf(`CREATE OR REPLACE SECRET %s (
+	sanitizedLName := s.desc.layer.Name
+	sanitizedLName = regexp.MustCompile("[^a-zA-Z0-9_]").ReplaceAllString(sanitizedLName, "_")
+	secretName := fmt.Sprintf("secret_%s", sanitizedLName)
+	req := fmt.Sprintf(`CREATE OR REPLACE SECRET %s (
     TYPE s3,
     USE_SSL %t,
     KEY_ID %s,
     SECRET %s,
-	ENDPOINT %s,
-	SCOPE s3://%s
-);`, secretName, s.desc.secure, s.desc.apiSecret, s.desc.apiSecret, s.desc.hostname, s.desc.bucket))
+	ENDPOINT '%s',
+	SCOPE 's3://%s',
+    URL_STYLE '%s'
+);`, secretName, s.desc.secure, s.desc.apiKey, s.desc.apiSecret, s.desc.hostname, s.desc.bucket, s.desc.urlStyle)
+	_, err := conn.Exec(req)
 	if err != nil {
 		return nil, err
 	}

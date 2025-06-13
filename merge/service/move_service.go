@@ -82,6 +82,12 @@ func (m *moveService) moveOne() (bool, error) {
 		layerTo = config.Config.Gigapi.Layers[layerFromIdx+1]
 	}
 
+	entryFrom := m.t.Index.Get(plan.LayerFrom, plan.PathFrom)
+	if entryFrom == nil {
+		m.t.Index.GetMovePlanner().EndMove(plan)
+		return true, nil
+	}
+
 	switch m.layer.Type + layerTo.Type {
 	case "fsfs":
 		err = m.doMoveFs2Fs(plan, layerTo)
@@ -96,19 +102,22 @@ func (m *moveService) moveOne() (bool, error) {
 	case "s3":
 		err = m.doRemoveS3(plan)
 	default:
-		return false, fmt.Errorf("unsupported move from %s to %s", m.layer.Type, layerTo.Type)
-
+		err = fmt.Errorf("unsupported move from %s to %s", m.layer.Type, layerTo.Type)
 	}
 	if err != nil {
 		return false, err
 	}
+
+	entryTo := *entryFrom
+	entryTo.Path = plan.PathTo
+	entryTo.Layer = plan.LayerTo
+	_, err = m.t.Index.Batch([]*metadata.IndexEntry{&entryTo}, []*metadata.IndexEntry{entryFrom}).Get()
 
 	m.t.Index.GetMovePlanner().EndMove(plan)
 	return true, nil
 }
 
 func (m *moveService) doMoveFs2Fs(plan metadata.MovePlan, layerTo config.LayersConfiguration) error {
-
 	pathFrom, err := buildPath(m.layer, m.t, path.Join("data", plan.PathFrom))
 	if err != nil {
 		return err
@@ -119,11 +128,6 @@ func (m *moveService) doMoveFs2Fs(plan metadata.MovePlan, layerTo config.LayersC
 	}
 
 	fmt.Printf("Moving %s to %s\n", pathFrom, pathTo)
-
-	entryFrom := m.t.Index.Get(plan.LayerFrom, plan.PathFrom)
-	if entryFrom == nil {
-		return nil
-	}
 
 	dirTo := filepath.Dir(pathTo)
 	os.MkdirAll(dirTo, 0o755)
@@ -139,16 +143,11 @@ func (m *moveService) doMoveFs2Fs(plan metadata.MovePlan, layerTo config.LayersC
 	}
 	defer f2.Close()
 	io.Copy(f2, f)
-
-	entryTo := *entryFrom
-	entryTo.Path = plan.PathTo
-	entryTo.Layer = plan.LayerTo
-	_, err = m.t.Index.Batch([]*metadata.IndexEntry{&entryTo}, []*metadata.IndexEntry{entryFrom}).Get()
 	return err
 }
 
 func (m *moveService) doMoveFs2S3(plan metadata.MovePlan, layerTo config.LayersConfiguration) error {
-	desc, err := parseS3Url(layerTo.URL)
+	desc, err := parseS3Url(layerTo)
 	if err != nil {
 		return err
 	}
@@ -176,7 +175,7 @@ func (m *moveService) doMoveFs2S3(plan metadata.MovePlan, layerTo config.LayersC
 }
 
 func (m *moveService) doMoveS32Fs(plan metadata.MovePlan, layerTo config.LayersConfiguration) error {
-	desc, err := parseS3Url(m.layer.URL)
+	desc, err := parseS3Url(m.layer)
 	if err != nil {
 		return err
 	}
@@ -212,7 +211,7 @@ func (m *moveService) doMoveS32Fs(plan metadata.MovePlan, layerTo config.LayersC
 }
 
 func (m *moveService) doMoveS32S3(plan metadata.MovePlan, layerTo config.LayersConfiguration) error {
-	descFrom, err := parseS3Url(m.layer.URL)
+	descFrom, err := parseS3Url(m.layer)
 	if err != nil {
 		return err
 	}
@@ -249,7 +248,7 @@ func (m *moveService) doMoveS32S3(plan metadata.MovePlan, layerTo config.LayersC
 		return fmt.Errorf("failed to download file from S3: %w", err)
 	}
 
-	descTo, err := parseS3Url(layerTo.URL)
+	descTo, err := parseS3Url(layerTo)
 	if err != nil {
 		return err
 	}
@@ -274,7 +273,7 @@ func (m *moveService) doRemoveFs(plan metadata.MovePlan) error {
 }
 
 func (m *moveService) doRemoveS3(plan metadata.MovePlan) error {
-	descFrom, err := parseS3Url(m.layer.URL)
+	descFrom, err := parseS3Url(m.layer)
 	if err != nil {
 		return err
 	}

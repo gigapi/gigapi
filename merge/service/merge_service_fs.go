@@ -37,12 +37,17 @@ func newFsMergeService(layer config.LayersConfiguration, table *shared.Table) (m
 		dataPath: dataPath,
 		table:    table,
 	}
+	savePerf, err := newFsSavePerformer(layer, table)
+	if err != nil {
+		return nil, err
+	}
 	manager := &mergeServiceManager{
 		dataPath:              dataPath,
 		tmpPath:               tmpPath,
 		table:                 table,
 		index:                 table.Index,
 		mergeServicePerformer: performer,
+		savePerformer:         savePerf,
 	}
 	return manager, nil
 }

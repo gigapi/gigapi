@@ -47,20 +47,16 @@ type saveServiceManager struct {
 
 func newFsSaveService(layer config.LayersConfiguration, table *shared.Table) (*saveServiceManager, error) {
 	tmpPath := os.TempDir()
-	dataPath, err := buildPath(layer, table, "data")
+
+	perf, err := newFsSavePerformer(layer, table)
 	if err != nil {
 		return nil, err
 	}
-	os.MkdirAll(dataPath, 0755)
 	res := &saveServiceManager{
-		table:   table,
-		layer:   layer,
-		tmpPath: tmpPath,
-		savePerformer: &fsSavePerformer{
-			layer:    layer,
-			table:    table,
-			dataPath: dataPath,
-		},
+		table:         table,
+		layer:         layer,
+		tmpPath:       tmpPath,
+		savePerformer: perf,
 	}
 	return res, nil
 }
@@ -143,6 +139,19 @@ type fsSavePerformer struct {
 	layer    config.LayersConfiguration
 	table    *shared.Table
 	dataPath string
+}
+
+func newFsSavePerformer(layer config.LayersConfiguration, table *shared.Table) (*fsSavePerformer, error) {
+	dataPath, err := buildPath(layer, table, "data")
+	if err != nil {
+		return nil, err
+	}
+	os.MkdirAll(dataPath, 0755)
+	return &fsSavePerformer{
+		layer:    layer,
+		table:    table,
+		dataPath: dataPath,
+	}, nil
 }
 
 func (f *fsSavePerformer) MkDirAll(part ...string) error {

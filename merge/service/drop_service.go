@@ -34,7 +34,7 @@ func newDropService(layer config.LayersConfiguration, t *shared.Table) (*dropSer
 		layer:    layer,
 		ctx:      context.Background(),
 		t:        t,
-		writerId: fmt.Sprintf("drop_service_%s_%s", t.Database, t.Name),
+		writerId: "", /*fmt.Sprintf("drop_service_%s_%s", t.Database, t.Name)*/
 	}
 
 	switch layer.Type {
@@ -44,7 +44,7 @@ func newDropService(layer config.LayersConfiguration, t *shared.Table) (*dropSer
 			return nil, err
 		}
 	case "s3":
-		d.s3Desc, err = parseS3Url(layer.URL)
+		d.s3Desc, err = parseS3Url(layer)
 		if err != nil {
 			return nil, err
 		}
@@ -117,7 +117,10 @@ func (d *dropService) dropOne() (bool, error) {
 
 func (d *dropService) dropOneFs(plan metadata.DropPlan) error {
 	path := filepath.Join(d.fsPath, plan.Path)
-	os.Remove(path)
+	err := os.Remove(path)
+	if err != nil {
+		fmt.Printf("Error removing %s: %v\n", path, err)
+	}
 	return nil
 }
 
@@ -125,6 +128,7 @@ func (d *dropService) dropOneS3(plan metadata.DropPlan) error {
 	minioClient, err := minio.New(d.s3Desc.hostname, &minio.Options{
 		Creds:  credentials.NewStaticV4(d.s3Desc.apiKey, d.s3Desc.apiSecret, ""),
 		Secure: d.s3Desc.secure, // Set to false if you're not using HTTPS
+
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create MinIO client: %w", err)
@@ -135,6 +139,9 @@ func (d *dropService) dropOneS3(plan metadata.DropPlan) error {
 		path = filepath.Join(path, plan.Path)
 	}
 	dropKey := fmt.Sprintf("%s%s/%s/%s", path, d.database, d.table, plan.Path)
-	minioClient.RemoveObject(context.Background(), d.s3Desc.bucket, dropKey, minio.RemoveObjectOptions{})
+	err = minioClient.RemoveObject(context.Background(), d.s3Desc.bucket, dropKey, minio.RemoveObjectOptions{})
+	if err != nil {
+		fmt.Println("s3 rm error: ", err)
+	}
 	return nil
 }

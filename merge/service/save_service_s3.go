@@ -19,19 +19,27 @@ type s3SavePerformer struct {
 }
 
 func newS3SaveService(layer config.LayersConfiguration, table *shared.Table) (saveService, error) {
-	desc, err := parseS3Url(layer.URL)
+	perf, err := newS3SavePerformer(layer, table)
 	if err != nil {
 		return nil, err
 	}
 	return &saveServiceManager{
-		table:   table,
-		layer:   layer,
-		tmpPath: os.TempDir(),
-		savePerformer: &s3SavePerformer{
-			layer: layer,
-			t:     table,
-			desc:  desc,
-		},
+		table:         table,
+		layer:         layer,
+		tmpPath:       os.TempDir(),
+		savePerformer: perf,
+	}, nil
+}
+
+func newS3SavePerformer(layer config.LayersConfiguration, table *shared.Table) (*s3SavePerformer, error) {
+	desc, err := parseS3Url(layer)
+	if err != nil {
+		return nil, err
+	}
+	return &s3SavePerformer{
+		layer: layer,
+		t:     table,
+		desc:  desc,
 	}, nil
 }
 

@@ -189,40 +189,47 @@ type File struct {
 	Type      string `json:"type"`
 }
 
+func ConsistencyTestIter(t *testing.T, count *int64) error {
+	url := "http://localhost:7971/gigapi/write"
+	data := `weather,location=us-midwest,season=summer temperature=82 1748253664000000000
+weather,location=us-midwest,season=summer temperature=83
+weather,location=us-midwest,season2=summer2 temperature=84
+weather,location=us-midwest,season2=summer2 temperature=84`
+
+	req, err := http.NewRequest("POST", url, bytes.NewBufferString(data))
+	if err != nil {
+		t.Fatal("error creating request: ", err)
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("error sending request: ", err)
+		return nil
+	}
+	defer resp.Body.Close()
+
+	_, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println("error reading response: ", err)
+		return nil
+	}
+	*count += 4
+	fmt.Printf("Total rows: %d\n", *count)
+	return nil
+}
+
 func TestConsistency(t *testing.T) {
 	if os.Getenv("INTERNAL_TEST") != "1" {
 		return
 	}
-	count := 0
+	count := int64(0)
 	nowNs := time.Now().UnixNano()
 	tillNextSec := 1000000000 - nowNs%1000000000
 	time.Sleep(time.Nanosecond * time.Duration(tillNextSec))
 	tck := time.NewTicker(time.Second)
 	for range tck.C {
-		url := "http://localhost:7971/gigapi/write"
-		data := `weather,location=us-midwest,season=summer temperature=82 1748253664000000000
-weather,location=us-midwest,season=summer temperature=83
-weather,location=us-midwest,season2=summer2 temperature=84
-weather,location=us-midwest,season2=summer2 temperature=84`
-
-		req, err := http.NewRequest("POST", url, bytes.NewBufferString(data))
-		if err != nil {
-			t.Fatal("error creating request: ", err)
-		}
-
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			t.Fatal("error sending request: ", err)
-		}
-		defer resp.Body.Close()
-
-		_, err = ioutil.ReadAll(resp.Body)
-		if err != nil {
-			t.Fatal("error reading response: ", err)
-		}
-		count += 4
-		fmt.Printf("Total rows: %d\n", count)
+		ConsistencyTestIter(t, &count)
 	}
 
 }

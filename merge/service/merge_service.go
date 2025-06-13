@@ -6,9 +6,6 @@ import (
 	"github.com/gigapi/metadata"
 	"golang.org/x/sync/semaphore"
 	"html/template"
-	"os"
-	"path"
-	"path/filepath"
 	"time"
 )
 
@@ -33,6 +30,7 @@ type mergeServiceManager struct {
 	table                 *shared.Table
 	index                 metadata.TableIndex
 	mergeServicePerformer mergeServicePerformer
+	savePerformer         savePerformer
 }
 
 var tmpl = func() *template.Template {
@@ -105,11 +103,7 @@ func (f *mergeServiceManager) updateIndex(merge metadata.MergePlan) error {
 		}
 		rowCount += fromIdx.RowCount
 	}
-	path, err := filepath.Abs(path.Join(f.dataPath, merge.To))
-	if err != nil {
-		return err
-	}
-	stat, err := os.Stat(path)
+	size, err := f.savePerformer.SizeB(merge.To)
 	if err != nil {
 		return err
 	}
@@ -118,7 +112,7 @@ func (f *mergeServiceManager) updateIndex(merge metadata.MergePlan) error {
 		Database:  f.table.Database,
 		Table:     f.table.Name,
 		Path:      merge.To,
-		SizeBytes: stat.Size(),
+		SizeBytes: size,
 		RowCount:  rowCount,
 		ChunkTime: time.Now().UnixNano(),
 		Min:       _min,
