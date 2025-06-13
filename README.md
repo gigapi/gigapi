@@ -41,9 +41,9 @@ services:
       - "7971:7971"
     environment:
       - GIGAPI_ROOT=/data
-      - GIGAPI_LAYER_0_NAME=default
-      - GIGAPI_LAYER_0_TYPE=fs
-      - GIGAPI_LAYER_0_URL=file:///data
+      - GIGAPI_LAYERS_0_NAME=default
+      - GIGAPI_LAYERS_0_TYPE=fs
+      - GIGAPI_LAYERS_0_URL=file:///data
 ```
 ### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=18 /> Settings
 
