@@ -184,12 +184,18 @@ func NewHiveMergeTreeService(t *shared.Table) (*HiveMergeTreeService, error) {
 
 		os.MkdirAll(dataPath, 0o755)
 		os.MkdirAll(tmpPath, 0o755)
-		res.mergeService[l.Name] = &fsMergeService{
-			dataPath: dataPath,
-			tmpPath:  tmpPath,
-			table:    t,
-			index:    t.Index,
+		switch l.Type {
+		case "fs":
+			res.mergeService[l.Name], err = newFsMergeService(l, t)
+		case "s3":
+			res.mergeService[l.Name], err = newS3MergeService(l, t)
+		default:
+			return nil, fmt.Errorf("unsupported layer type: %q", l.Type)
 		}
+		if err != nil {
+			return nil, err
+		}
+
 		res.moveService[l.Name] = &moveService{
 			database: t.Database,
 			table:    t.Name,
@@ -197,12 +203,9 @@ func NewHiveMergeTreeService(t *shared.Table) (*HiveMergeTreeService, error) {
 			t:        t,
 			writerId: "",
 		}
-		res.dropService[l.Name] = &dropService{
-			database: t.Database,
-			table:    t.Name,
-			layer:    l,
-			t:        t,
-			writerId: "",
+		res.dropService[l.Name], err = newDropService(l, t)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -357,18 +360,8 @@ func (h *HiveMergeTreeService) Store(columns map[string]any) utils.Promise[int32
 	for _, part := range partsDesc {
 		id := h.calculatePartitionHash(part.Values)
 		if _, ok := h.partitions[config.Config.Gigapi.Layers[0].Name][id]; !ok {
-			tmpPath, err := buildPath(config.Config.Gigapi.Layers[0], h.Table, "tmp")
-			if err != nil {
-				return utils.Fulfilled[int32](err, 0)
-			}
-			dataPath, err := buildPath(config.Config.Gigapi.Layers[0], h.Table, "data")
-			if err != nil {
-				return utils.Fulfilled[int32](err, 0)
-			}
 			h.partitions[config.Config.Gigapi.Layers[0].Name][id], err = NewPartition(part.Values,
-				tmpPath,
-				dataPath,
-				h.getPartPath(part.Values),
+				config.Config.Gigapi.Layers[0],
 				h.Table)
 			if err != nil {
 				h.mtx.Unlock()

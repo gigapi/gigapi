@@ -1,20 +1,12 @@
 package service
 
 import (
-	"errors"
 	"fmt"
-	"github.com/gigapi/gigapi-config/config"
 	"github.com/gigapi/gigapi/v2/merge/data_types"
 	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/gigapi/gigapi/v2/utils"
-	"github.com/gigapi/metadata"
 	_ "github.com/marcboeker/go-duckdb/v2"
-	url2 "net/url"
-	"path"
-	"path/filepath"
-	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -39,7 +31,7 @@ type MergeTreeService struct {
 	less func(store any, i int32, j int32) bool
 }
 
-func NewMergeTreeService(t *shared.Table) (*MergeTreeService, error) {
+/*func NewMergeTreeService(t *shared.Table) (*MergeTreeService, error) {
 	res := &MergeTreeService{
 		Table:    t,
 		working:  0,
@@ -62,7 +54,7 @@ func NewMergeTreeService(t *shared.Table) (*MergeTreeService, error) {
 	return res, err
 }
 
-func (s *MergeTreeService) newMergeService() (mergeService, error) {
+/*func (s *MergeTreeService) newMergeService() (mergeService, error) {
 	if strings.HasPrefix(s.Table.Path, "s3://") {
 		return s.newS3MergeService()
 	}
@@ -144,9 +136,9 @@ func (s *MergeTreeService) getS3Config(path string) (s3Config, error) {
 		path:   bucketPath[1],
 		secure: secure,
 	}, nil
-}
+} */
 
-func (s *MergeTreeService) size() int64 {
+/*func (s *MergeTreeService) size() int64 {
 	return s.unorderedDataStore.GetSize()
 }
 
@@ -166,7 +158,7 @@ func validateData(dataStore dataStore, data map[string]data_types.IColumn) error
 	}
 
 	return dataStore.VerifyData(data)
-}
+} */
 
 func mergeColumns(unordered dataStore) []fieldDesc {
 	nameTypes := unordered.GetSchema()
@@ -177,7 +169,7 @@ func mergeColumns(unordered dataStore) []fieldDesc {
 	return res
 }
 
-func (s *MergeTreeService) flush() {
+/*func (s *MergeTreeService) flush() {
 	s.mtx.Lock()
 	unorderedDataStore := s.unorderedDataStore
 	s.unorderedDataStore = newUnorderedDataStore()
@@ -224,8 +216,9 @@ func (s *MergeTreeService) Stop() {
 
 func fastFillArray[T any](arr []T, data T) []T {
 	return data_types.FastFillArray(arr, data)
-}
+}*/
 
+// +
 func (s *MergeTreeService) validateColSizes(columns map[string]data_types.IColumn) error {
 	var size int64
 	i := -1
@@ -242,7 +235,7 @@ func (s *MergeTreeService) validateColSizes(columns map[string]data_types.IColum
 	return nil
 }
 
-func (s *MergeTreeService) validateData(columns map[string]data_types.IColumn) error {
+/*func (s *MergeTreeService) validateData(columns map[string]data_types.IColumn) error {
 	err := s.validateColSizes(columns)
 	if err != nil {
 		return err
@@ -251,8 +244,9 @@ func (s *MergeTreeService) validateData(columns map[string]data_types.IColumn) e
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 	return validateData(s.unorderedDataStore, columns)
-}
+}*/
 
+// +
 func (s *MergeTreeService) wrapColumns(columns map[string]any) (map[string]data_types.IColumn, error) {
 	_columns := make(map[string]data_types.IColumn, len(columns)+1)
 	var err error
@@ -266,6 +260,7 @@ func (s *MergeTreeService) wrapColumns(columns map[string]any) (map[string]data_
 	return _columns, nil
 }
 
+// +
 func (s *MergeTreeService) AutoTimestamp(columns map[string]data_types.IColumn) (map[string]data_types.IColumn, error) {
 	if !s.Table.AutoTimestamp {
 		return columns, nil
@@ -294,7 +289,7 @@ func (s *MergeTreeService) AutoTimestamp(columns map[string]data_types.IColumn) 
 	return columns, nil
 }
 
-func (s *MergeTreeService) Store(columns map[string]any) utils.Promise[int32] {
+/*func (s *MergeTreeService) Store(columns map[string]any) utils.Promise[int32] {
 	_columns, err := s.wrapColumns(columns)
 	if err != nil {
 		return utils.Fulfilled(err, int32(0))
@@ -321,9 +316,9 @@ func (s *MergeTreeService) Store(columns map[string]any) utils.Promise[int32] {
 	p := utils.New[int32]()
 	s.promises = append(s.promises, p)
 	return p
-}
+} */
 
-type PlanMerge struct {
+/*type PlanMerge struct {
 	From      []string
 	To        string
 	Iteration int
@@ -331,7 +326,7 @@ type PlanMerge struct {
 type FileDesc struct {
 	name string
 	size int64
-}
+}*/
 
 const MERGE_ITERATIONS = 4
 
@@ -341,7 +336,7 @@ func getMergeConfigurations() [][3]int64 {
 	return shared.GetMergeConfigurations()
 }
 
-func (s *MergeTreeService) PlanMerge() ([]metadata.MergePlan, error) {
+/*func (s *MergeTreeService) PlanMerge() ([]metadata.MergePlan, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
@@ -356,7 +351,7 @@ func (s *MergeTreeService) DoMerge() error {
 		return err
 	}
 	return s.Merge(plan)
-}
+}*/
 
 type MergeService interface {
 	Run()
