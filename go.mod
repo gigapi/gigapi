@@ -13,7 +13,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/influxdata/influxdb v1.12.0
-	github.com/marcboeker/go-duckdb/v2 v2.2.0
+	github.com/marcboeker/go-duckdb/v2 v2.3.1
 	github.com/minio/minio-go/v7 v7.0.91
 	github.com/spf13/afero v1.12.0
 	golang.org/x/exp v0.0.0-20250128182459-e0ece0dbea4c
@@ -27,12 +27,12 @@ require (
 	github.com/apache/thrift v0.21.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
-	github.com/duckdb/duckdb-go-bindings v0.1.14 // indirect
-	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.9 // indirect
-	github.com/duckdb/duckdb-go-bindings/darwin-arm64 v0.1.9 // indirect
-	github.com/duckdb/duckdb-go-bindings/linux-amd64 v0.1.9 // indirect
-	github.com/duckdb/duckdb-go-bindings/linux-arm64 v0.1.9 // indirect
-	github.com/duckdb/duckdb-go-bindings/windows-amd64 v0.1.9 // indirect
+	github.com/duckdb/duckdb-go-bindings v0.1.15 // indirect
+	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.10 // indirect
+	github.com/duckdb/duckdb-go-bindings/darwin-arm64 v0.1.10 // indirect
+	github.com/duckdb/duckdb-go-bindings/linux-amd64 v0.1.10 // indirect
+	github.com/duckdb/duckdb-go-bindings/linux-arm64 v0.1.10 // indirect
+	github.com/duckdb/duckdb-go-bindings/windows-amd64 v0.1.10 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/go-faster/errors v0.6.1 // indirect
@@ -47,8 +47,8 @@ require (
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
-	github.com/marcboeker/go-duckdb/arrowmapping v0.0.7 // indirect
-	github.com/marcboeker/go-duckdb/mapping v0.0.7 // indirect
+	github.com/marcboeker/go-duckdb/arrowmapping v0.0.8 // indirect
+	github.com/marcboeker/go-duckdb/mapping v0.0.9 // indirect
 	github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8 // indirect
 	github.com/minio/c2goasm v0.0.0-20190812172519-36a3d3bbc4f3 // indirect
 	github.com/minio/crc64nvme v1.0.1 // indirect
