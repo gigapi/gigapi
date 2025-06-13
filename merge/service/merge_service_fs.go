@@ -5,43 +5,52 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/gigapi/gigapi-config/config"
 	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/gigapi/gigapi/v2/merge/utils"
 	"github.com/gigapi/metadata"
-	"golang.org/x/sync/semaphore"
-	"html/template"
 	"io"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
-var CHSQL_VER = "v1.0.10"
-
-// const CHSQL_EXT_URL = "https://github.com/quackscience/duckdb-extension-clickhouse-sql/releases/download/{{.VER}}/chsql.{{.DUCKDB_VER}}.{{.ARCH}}.duckdb_extension"
-const CHSQL_EXT_URL = "community"
-
-type mergeService interface {
-	DoMerge([]metadata.MergePlan) error
-}
-
-type fsMergeService struct {
-	dataPath string
+type fsMergeServicePerformer struct {
 	tmpPath  string
+	dataPath string
 	table    *shared.Table
-	index    metadata.TableIndex
 }
 
-var tmpl = func() *template.Template {
-	_tmpl, err := template.New("chsql_url").Parse(CHSQL_EXT_URL)
+func newFsMergeService(layer config.LayersConfiguration, table *shared.Table) (mergeService, error) {
+	tmpPath, err := buildPath(layer, table, "tmp")
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return _tmpl
-}()
+	dataPath, err := buildPath(layer, table, "data")
+	if err != nil {
+		return nil, err
+	}
+	performer := &fsMergeServicePerformer{
+		tmpPath:  tmpPath,
+		dataPath: dataPath,
+		table:    table,
+	}
+	savePerf, err := newFsSavePerformer(layer, table)
+	if err != nil {
+		return nil, err
+	}
+	manager := &mergeServiceManager{
+		dataPath:              dataPath,
+		tmpPath:               tmpPath,
+		table:                 table,
+		index:                 table.Index,
+		mergeServicePerformer: performer,
+		savePerformer:         savePerf,
+	}
+	return manager, nil
+}
 
 func downloadToTempFile(url string, fname string) (string, error) {
 	// Create a temporary file
@@ -128,10 +137,7 @@ func installChSql(db *sql.DB) error {
 	return err
 }
 
-// TODO: ADD configuration for this
-var firstIterationSemaphore = semaphore.NewWeighted(1)
-
-func (f *fsMergeService) getAbsPaths(relPaths []string) []string {
+func (f *fsMergeServicePerformer) getAbsPaths(relPaths []string) []string {
 	from := make([]string, len(relPaths))
 	for i, p := range relPaths {
 		from[i] = filepath.Join(f.dataPath, p)
@@ -139,7 +145,7 @@ func (f *fsMergeService) getAbsPaths(relPaths []string) []string {
 	return from
 }
 
-func (f *fsMergeService) mergeFirstIteration(p metadata.MergePlan) error {
+func (f *fsMergeServicePerformer) mergeFirstIteration(p metadata.MergePlan) error {
 	firstIterationSemaphore.Acquire(context.Background(), 1)
 	defer firstIterationSemaphore.Release(1)
 
@@ -166,17 +172,10 @@ func (f *fsMergeService) mergeFirstIteration(p metadata.MergePlan) error {
 		return err
 	}
 
-	if f.index != nil {
-		err = f.updateIndex(p)
-		if err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
-func (f *fsMergeService) mergeMany(p metadata.MergePlan) error {
+func (f *fsMergeServicePerformer) mergeMany(p metadata.MergePlan) error {
 	conn, cancel, err := utils.ConnectDuckDB("?access_mode=READ_WRITE&allow_unsigned_extensions=1")
 	if err != nil {
 		return err
@@ -212,117 +211,7 @@ func (f *fsMergeService) mergeMany(p metadata.MergePlan) error {
 	return err
 }
 
-func (f *fsMergeService) merge(p metadata.MergePlan) error {
-	if p.Iteration == 1 {
-		return f.mergeFirstIteration(p)
-	}
-
-	/*
-		fmt.Printf("Merging files:\n  Base path: %s\n", f.path)
-		for _, file := range p.From {
-			fmt.Printf("  %s\n", file)
-		}
-		fmt.Printf("  Tmp path: %s\n", tmpFilePath)
-		fmt.Printf("  Data path: %s\n", finalFilePath)
-	*/
-
-	var err error
-
-	if len(p.From) == 1 {
-		from := filepath.Join(f.dataPath, p.From[0])
-		err = os.Rename(from, filepath.Join(f.dataPath, p.To))
-	} else {
-		err = f.mergeMany(p)
-	}
-	if err != nil {
-		return err
-	}
-
-	if f.index != nil {
-		err = f.updateIndex(p)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (f *fsMergeService) updateIndex(merge metadata.MergePlan) error {
-	_min := make(map[string]any)
-	_max := make(map[string]any)
-	var minTime int64
-	var maxTime int64
-	var rowCount int64
-	toDelete := make([]*metadata.IndexEntry, len(merge.From))
-	for i, file := range merge.From {
-		toDelete[i] = &metadata.IndexEntry{
-			Layer:    merge.Layer,
-			Database: f.table.Database,
-			Table:    f.table.Name,
-			Path:     file,
-			WriterID: merge.WriterID,
-		}
-		fromIdx := f.index.Get(merge.Layer, file)
-		if i == 0 {
-			minTime = fromIdx.MinTime
-			maxTime = fromIdx.MaxTime
-		} else {
-			minTime = min(minTime, fromIdx.MinTime)
-			maxTime = max(maxTime, fromIdx.MaxTime)
-		}
-		rowCount += fromIdx.RowCount
-	}
-	path, err := filepath.Abs(path.Join(f.dataPath, merge.To))
-	if err != nil {
-		return err
-	}
-	stat, err := os.Stat(path)
-	if err != nil {
-		return err
-	}
-	newIdx := &metadata.IndexEntry{
-		Layer:     merge.Layer,
-		Database:  f.table.Database,
-		Table:     f.table.Name,
-		Path:      merge.To,
-		SizeBytes: stat.Size(),
-		RowCount:  rowCount,
-		ChunkTime: time.Now().UnixNano(),
-		Min:       _min,
-		Max:       _max,
-		MinTime:   minTime,
-		MaxTime:   maxTime,
-		WriterID:  "",
-	}
-	prom := f.index.Batch([]*metadata.IndexEntry{newIdx}, toDelete)
-	_, err = prom.Get()
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Finishing merge: %v\n", merge)
-	_, err = f.index.GetMergePlanner().EndMerge(merge).Get()
-	return err
-}
-
-func (f *fsMergeService) doMerge(merges []metadata.MergePlan, merge func(p metadata.MergePlan) error) error {
-	//errGroup := errgroup.Group{}
-	//sem := semaphore.NewWeighted(10)
-	for _, m := range merges {
-		_m := m
-		/*sem.Acquire(context.Background(), 1)
-		defer sem.Release(1)*/
-		err := merge(_m)
-		if err != nil {
-			//errGroup.Cancel(err)
-			return err
-		}
-	}
-	return nil
-}
-
-func (f *fsMergeService) DoMerge(merges []metadata.MergePlan) error {
-	_merges := make([]metadata.MergePlan, len(merges))
-	copy(_merges, merges)
-	return f.doMerge(_merges, f.merge)
+func (f *fsMergeServicePerformer) mergeOne(p metadata.MergePlan) error {
+	from := filepath.Join(f.dataPath, p.From[0])
+	return os.Rename(from, filepath.Join(f.dataPath, p.To))
 }

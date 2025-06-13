@@ -3,86 +3,93 @@ package service
 import (
 	"context"
 	"fmt"
-	"os"
-	"path"
-
-	"github.com/google/uuid"
+	"github.com/gigapi/gigapi-config/config"
+	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"os"
+	"strings"
 )
 
-type s3Config struct {
-	url    string
-	key    string
-	secret string
-	bucket string
-	region string
-	path   string
-	secure bool
+type s3SavePerformer struct {
+	layer config.LayersConfiguration
+	t     *shared.Table
+
+	desc s3Desc
 }
 
-type s3SaveService struct {
-	fsSaveService
-	s3Config
+func newS3SaveService(layer config.LayersConfiguration, table *shared.Table) (saveService, error) {
+	perf, err := newS3SavePerformer(layer, table)
+	if err != nil {
+		return nil, err
+	}
+	return &saveServiceManager{
+		table:         table,
+		layer:         layer,
+		tmpPath:       os.TempDir(),
+		savePerformer: perf,
+	}, nil
 }
 
-func (s *s3SaveService) Save(fields []fieldDesc, unorderedData dataStore) (string, error) {
-	uid, err := uuid.NewUUID()
+func newS3SavePerformer(layer config.LayersConfiguration, table *shared.Table) (*s3SavePerformer, error) {
+	desc, err := parseS3Url(layer)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	fName := uid.String() + ".1.parquet"
-	tmpFileName := path.Join("/tmp", fName)
-	err = s.saveTmpFile(tmpFileName, fields, unorderedData)
-	if err != nil {
-		return "", err
-	}
-	defer os.Remove(tmpFileName)
-
-	return fName, s.uploadToS3(tmpFileName)
+	return &s3SavePerformer{
+		layer: layer,
+		t:     table,
+		desc:  desc,
+	}, nil
 }
 
-func (s *s3SaveService) createMinioClient() (*minio.Client, error) {
-	minioClient, err := minio.New(s.url, &minio.Options{
-		Creds:  credentials.NewStaticV4(s.key, s.secret, ""),
-		Secure: s.secure,
-		Region: s.region,
-	})
-	return minioClient, err
-}
-
-func (s *s3SaveService) uploadToS3(filePath string) error {
-	minioClient, err := s.createMinioClient()
-	if err != nil {
-		return fmt.Errorf("failed to create minio client: %w", err)
-	}
-
-	// Open the file
-	file, err := os.Open(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to open file: %w", err)
-	}
-	defer file.Close()
-
-	// Get file information
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return fmt.Errorf("failed to get file info: %w", err)
-	}
-
-	// Get the file name from the path
-	fileName := path.Base(filePath)
-
-	// Create the S3 key (path in the bucket)
-	s3Key := path.Join(s.s3Config.path, fileName)
-
-	// Upload the file to S3
-	_, err = minioClient.PutObject(context.Background(), s.bucket, s3Key, file, fileInfo.Size(), minio.PutObjectOptions{
-		ContentType: "application/octet-stream",
+func (s *s3SavePerformer) moveTmp(tmpPath string, filePath string) error {
+	defer os.Remove(tmpPath)
+	minioClient, err := minio.New(s.desc.hostname, &minio.Options{
+		Creds:  credentials.NewStaticV4(s.desc.apiKey, s.desc.apiSecret, ""),
+		Secure: s.desc.secure, // Set to false if you're not using HTTPS
 	})
 	if err != nil {
-		return fmt.Errorf("failed to upload file to S3: %w", err)
+		return fmt.Errorf("failed to create MinIO client: %w", err)
 	}
+	prefix := s.desc.path
+	if prefix != "" {
+		prefix += "/"
+	}
+	keyTo := fmt.Sprintf("%s%s/%s/%s", prefix, s.t.Database, s.t.Name, filePath)
+	_, err = minioClient.FPutObject(context.Background(), s.desc.bucket, keyTo, tmpPath, minio.PutObjectOptions{})
+	return err
+}
 
+func (s *s3SavePerformer) Join(part ...string) string {
+	return strings.Join(part, "/")
+}
+
+func (s *s3SavePerformer) base(path string) string {
+	parts := strings.Split(path, "/")
+	return parts[len(parts)-1]
+}
+
+func (s *s3SavePerformer) SizeB(path string) (int64, error) {
+	minioClient, err := minio.New(s.desc.hostname, &minio.Options{
+		Creds:  credentials.NewStaticV4(s.desc.apiKey, s.desc.apiSecret, ""),
+		Secure: s.desc.secure, // Set to false if you're not using HTTPS
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to create MinIO client: %w", err)
+	}
+	prefix := s.desc.path
+	if prefix != "" {
+		prefix += "/"
+	}
+	keyTo := fmt.Sprintf("%s%s/%s/%s", prefix, s.t.Database, s.t.Name, path)
+	stat, err := minioClient.StatObject(context.Background(), s.desc.bucket, keyTo, minio.StatObjectOptions{})
+	if err != nil {
+		return 0, fmt.Errorf("failed to get object size: %w", err)
+	}
+	return stat.Size, nil
+}
+
+func (s *s3SavePerformer) MkDirAll(part ...string) error {
 	return nil
 }

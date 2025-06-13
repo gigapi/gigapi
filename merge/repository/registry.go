@@ -197,8 +197,8 @@ func RegisterNewTable(table *shared.Table) error {
 	registryMtx.Lock()
 	defer registryMtx.Unlock()
 	switch table.Engine {
-	case "Merge":
-		registry[[2]string{table.Database, table.Name}], err = service.NewMergeTreeService(table)
+	/*case "Merge":
+	registry[[2]string{table.Database, table.Name}], err = service.NewMergeTreeService(table)*/
 	case "HiveMerge":
 		registry[[2]string{table.Database, table.Name}] =
 			service.NewMultithreadHiveMergeTreeService(0, table)
