@@ -117,10 +117,7 @@ func (d *dropService) dropOne() (bool, error) {
 
 func (d *dropService) dropOneFs(plan metadata.DropPlan) error {
 	path := filepath.Join(d.fsPath, plan.Path)
-	err := os.Remove(path)
-	if err != nil {
-		fmt.Printf("Error removing %s: %v\n", path, err)
-	}
+	os.Remove(path)
 	return nil
 }
 
