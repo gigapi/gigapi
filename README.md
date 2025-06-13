@@ -237,8 +237,59 @@ In this configuration:
     - Data is globally accessible to all cluster nodes (`GLOBAL=true`).
     - Data remains in this layer indefinitely (`TTL=0`).
 
-> [!NOTE]
-> The s3 layer type is currently under development.
+## <img src="https://github.com/user-attachments/assets/74a1fa93-5e7e-476d-93cb-be565eca4a59" height=20 /> S3 Configuration
+
+GigAPI supports S3-compatible storage for data layers. The S3 URL format is as follows:
+
+```
+s3://[access_key]:[secret_key]@[endpoint_url]/[bucket]/[path/to/base]?[parameters]
+```
+
+### URL Components:
+
+- `access_key`: Your S3 access key
+- `secret_key`: Your S3 secret key
+- `endpoint_url`: The S3 endpoint URL (e.g., `s3.amazonaws.com` for AWS S3)
+- `bucket`: Your S3 bucket name
+- `path/to/base`: Optional path prefix within the bucket
+
+### URL Parameters:
+
+| Parameter | Description                                                                   | Default |
+|-----------|-------------------------------------------------------------------------------|---------|
+| secure    | Whether to use SSL. Set to `true` for most cases, `false` for local testing   | true    |
+| url-style | S3 URL style. Use `vhost` for AWS S3, `path` for most other S3 implementations| vhost   |
+
+### Examples:
+
+1. AWS S3:
+```
+s3://AKIAIOSFODNN7EXAMPLE:EXAMPLEKEY@s3.amazonaws.com/my-bucket/data
+```
+
+2. Local MinIO server:
+```
+s3://minioadmin:minioadmin@localhost:9000/gigapi?secure=false&url-style=path
+```
+
+3. DigitalOcean Spaces:
+```
+s3://DO00EXAMPLE1ACCESSKEY:DO00EXAMPLE1SECRETKEY@nyc3.digitaloceanspaces.com/my-space/data?url-style=path
+```
+
+### Security Considerations:
+
+1. Always use `secure=true` in production environments to ensure encrypted connections.
+2. Protect your access and secret keys. Consider using environment variables or a secrets management system instead of hardcoding them in the URL.
+3. Use IAM roles and policies (for AWS) or equivalent access control mechanisms to limit permissions to the minimum necessary.
+
+### Troubleshooting:
+
+- If you encounter "Access Denied" errors, double-check your access key, secret key, and bucket permissions.
+- For connection issues, verify the endpoint URL and ensure proper network access.
+- When using non-AWS S3 implementations, you may need to set `url-style=path`.
+
+> Note: Always refer to your specific S3 provider's documentation for any provider-specific configurations or limitations.
 
 ## <img src="https://github.com/user-attachments/assets/74a1fa93-5e7e-476d-93cb-be565eca4a59" height=20 />  GigAPI Diagram
 
