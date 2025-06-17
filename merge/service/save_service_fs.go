@@ -1,18 +1,19 @@
 package service
 
 import (
-	"github.com/apache/arrow/go/v14/arrow"
-	"github.com/apache/arrow/go/v14/arrow/array"
-	"github.com/apache/arrow/go/v14/arrow/memory"
-	"github.com/apache/arrow/go/v14/parquet"
-	"github.com/apache/arrow/go/v14/parquet/pqarrow"
-	"github.com/gigapi/gigapi-config/config"
-	"github.com/gigapi/gigapi/v2/merge/data_types"
-	"github.com/gigapi/gigapi/v2/merge/shared"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
+
+	"github.com/apache/arrow-go/v18/arrow"
+	"github.com/apache/arrow-go/v18/arrow/array"
+	"github.com/apache/arrow-go/v18/arrow/memory"
+	"github.com/apache/arrow-go/v18/parquet"
+	"github.com/apache/arrow-go/v18/parquet/pqarrow"
+	"github.com/gigapi/gigapi-config/config"
+	"github.com/gigapi/gigapi/v2/merge/data_types"
+	"github.com/gigapi/gigapi/v2/merge/shared"
 )
 
 type fieldDesc [2]string
