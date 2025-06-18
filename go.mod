@@ -4,7 +4,7 @@ go 1.24.2
 
 require (
 	github.com/apache/arrow-go/v18 v18.3.0
-	github.com/expr-lang/expr v1.17.2
+	github.com/expr-lang/expr v1.17.5
 	github.com/gigapi/gigapi-config v0.0.9
 	github.com/gigapi/gigapi-querier v0.0.26
 	github.com/gigapi/metadata v0.0.4
@@ -22,7 +22,6 @@ require (
 
 require (
 	github.com/andybalholm/brotli v1.1.1 // indirect
-	github.com/apache/arrow/go/v14 v14.0.2 // indirect
 	github.com/apache/thrift v0.21.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
