@@ -8,7 +8,7 @@ VALUE_NAME="temperature"
 MIN_VALUE=70
 MAX_VALUE=100
 FREQUENCY=5
-API_URL="https://localhost:7971/write"
+API_URL="https://gigapi:7971/write"
 
 # Backfill mode defaults
 BACKFILL_MODE=false
