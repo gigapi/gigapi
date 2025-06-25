@@ -33,6 +33,9 @@ func getDatabase(r *http.Request) (string, error) {
 func InsertIntoHandler(w http.ResponseWriter, r *http.Request) error {
 	contentType := r.Header.Get("Content-Type")
 	parser, err := parsers.GetParser(contentType, nil, nil)
+	if err != nil {
+		return err
+	}
 
 	database, err := getDatabase(r)
 	if err != nil {
@@ -77,7 +80,7 @@ func InsertIntoHandler(w http.ResponseWriter, r *http.Request) error {
 		if _database == "" {
 			database = _res.Database
 		}
-		promises = append(promises, repository.Store(_database, _res.Table, _res.Data))
+		promises = append(promises, repository.Store(_database, _res.Table, _res.Data, _res.IsExternal))
 	}
 	for _, p := range promises {
 		_, err = p.Get()
@@ -88,3 +91,4 @@ func InsertIntoHandler(w http.ResponseWriter, r *http.Request) error {
 	w.WriteHeader(http.StatusNoContent)
 	return nil
 }
+

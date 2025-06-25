@@ -8,7 +8,6 @@ import (
 	"github.com/gigapi/gigapi/v2/merge/service"
 	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/gigapi/gigapi/v2/utils"
-	"github.com/gigapi/metadata"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -62,7 +61,14 @@ func RunMerge() {
 var tableNameCheck = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 var m sync.Mutex
 
-func Store(db string, name string, columns map[string]any) utils.Promise[int32] {
+func Store(db string, name string, columns map[string]any, isExternal bool) utils.Promise[int32] {
+	if isExternal {
+		cols, _ := columns["columns"].([]string)
+		types, _ := columns["types"].([]string)
+		err := RegisterExternalTable(db, name, cols, types)
+		return utils.Fulfilled[int32](err, 0)
+	}
+
 	if db == "" {
 		db = "default"
 	}
@@ -82,32 +88,7 @@ func Store(db string, name string, columns map[string]any) utils.Promise[int32] 
 	return table.Store(columns)
 }
 
-func getTableIndex(table *shared.Table) (metadata.TableIndex, error) {
-	layers := make([]metadata.Layer, len(config.Config.Gigapi.Layers))
-	for i, l := range config.Config.Gigapi.Layers {
-		layers[i] = metadata.Layer{
-			URL:    l.URL,
-			Name:   l.Name,
-			Type:   l.Type,
-			TTLSec: int32(l.TTL.Seconds()),
-		}
-	}
-	switch config.Config.Gigapi.Metadata.Type {
-	case "json":
-		return metadata.NewJSONIndex(
-			config.Config.Gigapi.Root,
-			table.Database,
-			table.Name,
-			layers)
-	case "redis":
-		return metadata.NewRedisIndex(
-			config.Config.Gigapi.Metadata.URL,
-			table.Database,
-			table.Name,
-			layers)
-	}
-	return nil, fmt.Errorf("unknown metadata type: %q", config.Config.Gigapi.Metadata.Type)
-}
+
 
 func RegisterSimpleTable(db, name string) error {
 	if db == "" {

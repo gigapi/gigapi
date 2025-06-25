@@ -90,6 +90,37 @@ weather,location=us-west,season=summer temperature=99
 EOF
 ```
 
+### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=18 /> Parquet Ingestion
+GigAPI also supports ingesting Parquet files directly via a JSON-based API. This is useful for bulk-loading data that is already in Parquet format.
+
+**Endpoint:** `/gigapi/ingest/parquet`
+
+**Method:** `POST`
+
+**Payload:**
+```json
+{
+  "database": "target_database_name",
+  "table": "target_table_name",
+  "files": [
+    {
+      "url": "https://example.com/data.parquet",
+      "type": "https"
+    },
+    {
+      "url": "s3://bucket/path/data2.parquet",
+      "type": "s3"
+    }
+  ]
+}
+```
+
+**Details:**
+- The `database` and `table` fields are required and specify the destination for the data.
+- The `files` array contains a list of Parquet files to ingest. Each file object must have a `url` and a `type` (`https`, `s3`, or `local`).
+- The table will be created automatically if it doesn't exist.
+- This endpoint is for non-timeseries data. The table will be created with `AutoTimestamp: false`.
+
 ### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=18 /> FlightSQL
 
 > [!NOTE]

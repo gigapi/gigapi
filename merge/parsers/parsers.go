@@ -17,10 +17,11 @@ type IParser interface {
 }
 
 type ParserResponse struct {
-	Database string
-	Table    string
-	Data     map[string]any
-	Error    error
+	Database   string
+	Table      string
+	Data       map[string]any
+	IsExternal bool
+	Error      error
 }
 
 func RegisterParser(name string, parser ParserFactory) {
