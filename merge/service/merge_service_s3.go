@@ -140,7 +140,7 @@ func (s *s3MergeServicePerformer) createSecret(conn *sql.DB) (func(), error) {
 }
 
 func (s *s3MergeServicePerformer) mergeFirstIteration(p metadata.MergePlan) error {
-	conn, cancel, err := utils.ConnectDuckDB("?access_mode=READ_WRITE&allow_unsigned_extensions=1")
+	conn, cancel, err := utils.ConnectDuckDB(utils.MEMDB_ACCESS_STRING)
 	if err != nil {
 		return err
 	}
@@ -166,7 +166,7 @@ func (s *s3MergeServicePerformer) mergeFirstIteration(p metadata.MergePlan) erro
 }
 
 func (s *s3MergeServicePerformer) mergeMany(p metadata.MergePlan) error {
-	conn, cancel, err := utils.ConnectDuckDB("?access_mode=READ_WRITE&allow_unsigned_extensions=1")
+	conn, cancel, err := utils.ConnectDuckDB(utils.MEMDB_ACCESS_STRING)
 	if err != nil {
 		return err
 	}

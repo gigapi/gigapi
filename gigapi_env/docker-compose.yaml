@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:13
+    network_mode: host
+    environment:
+      POSTGRES_DB: mydb
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+    volumes:
+      - ./_data/postgres:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio
+    network_mode: host
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - ./_data/minio:/data
+
+  gigapi:
+    build: ../
+    network_mode: host
+    volumes:
+      - ./_data/gigapi:/data
+    environment:
+      GIGAPI_MERGE_TIMEOUT_S: 10
+      GIGAPI_ROOT: /data
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: mydb

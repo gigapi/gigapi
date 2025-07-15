@@ -8,8 +8,8 @@ import (
 	"github.com/gigapi/gigapi/v2/merge/utils"
 	"github.com/gigapi/gigapi/v2/modules"
 	"github.com/gigapi/metadata"
-	"net/http"
 	"os"
+	"path"
 )
 
 func Init(api modules.Api) {
@@ -20,11 +20,11 @@ func Init(api modules.Api) {
 	for _, mc := range shared.GetMergeConfigurations() {
 		metadata.MergeConfigurations = append(metadata.MergeConfigurations, mc)
 	}
-	err := os.MkdirAll(config.Config.Gigapi.Root, 0750)
+	err := os.MkdirAll(path.Join(config.Config.Gigapi.Root, "_tmp"), 0750)
 	if err != nil {
 		panic(err)
 	}
-	conn, cancel, err := utils.ConnectDuckDB("?access_mode=READ_WRITE&allow_unsigned_extensions=1")
+	conn, cancel, err := utils.ConnectDuckDB(utils.MEMDB_ACCESS_STRING)
 	if err != nil {
 		panic(err)
 	}
@@ -51,12 +51,21 @@ func Init(api modules.Api) {
 func InitHandlers(api modules.Api) {
 	handlers.API = api
 	api.RegisterRoute(&modules.Route{
+		Path:    "/query",
+		Methods: []string{"POST", "OPTIONS"},
+		Handler: handlers.Query,
+	})
+	api.RegisterRoute(&modules.Route{
 		Path:    "/gigapi/insert",
 		Methods: []string{"POST"},
 		Handler: handlers.InsertIntoHandler,
 	})
-
 	api.RegisterRoute(&modules.Route{
+		Path:    "/gigapi/writer/internal",
+		Methods: []string{"GET"},
+		Handler: handlers.GetInternal,
+	})
+	/*api.RegisterRoute(&modules.Route{
 		Path:    "/gigapi/write/{db}",
 		Methods: []string{"POST"},
 		Handler: handlers.InsertIntoHandler,
@@ -101,6 +110,5 @@ func InitHandlers(api modules.Api) {
 			w.WriteHeader(http.StatusNoContent)
 			return nil
 		},
-	})
-
+	})*/
 }
