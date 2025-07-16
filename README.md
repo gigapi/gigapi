@@ -90,6 +90,42 @@ weather,location=us-west,season=summer temperature=99
 EOF
 ```
 
+### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=18 /> Parquet Ingestion
+GigAPI also supports ingesting Parquet files directly via a JSON-based API. This is useful for bulk-loading data that is already in Parquet format.
+
+**Endpoint:** `/gigapi/ingest/parquet`
+
+**Method:** `POST`
+
+**Payload:**
+```json
+{
+  "database": "target_database_name",
+  "table": "target_table_name",
+  "files": [
+    {
+      "url": "https://example.com/data.parquet",
+      "type": "https"
+    },
+    {
+      "url": "s3://bucket/path/data2.parquet",
+      "type": "s3"
+    }
+  ],
+  "time_column": "optional_time_column_name",
+  "time_format": "optional_time_format",
+  "is_timeseries": true
+}
+```
+
+**Details:**
+- The `database` and `table` fields are required and specify the destination for the data.
+- The `files` array contains a list of Parquet files to ingest. Each file object must have a `url` and a `type` (`https`, `s3`, or `local`).
+- The table will be created automatically if it doesn't exist.
+- By default, ingested data is treated as timeseries. To handle non-timeseries data, set `"is_timeseries": false`.
+- You can manually specify a time column using the `time_column` field. If not provided, GigAPI will look for a column named `timestamp` or `time`.
+- The `time_format` field can be used to specify the format of the time column. If not provided, GigAPI will attempt to automatically parse the timestamp.
+
 ### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=18 /> FlightSQL
 
 > [!NOTE]

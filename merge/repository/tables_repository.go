@@ -3,10 +3,9 @@ package repository
 import (
 	"database/sql"
 	"fmt"
-	"sync"
 )
 
-var dbMtx sync.Mutex
+
 
 // TODO: Implement the incremental initialization of TablesTable
 
