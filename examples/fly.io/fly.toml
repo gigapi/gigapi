@@ -46,6 +46,17 @@ kill_timeout = '5s'
     hard_limit = 100
     soft_limit = 50
 
+[[services]]
+  internal_port = 8082
+  protocol = "tcp"
+
+  [[services.ports]]
+    handlers = ["tls"]
+    port = "8082"
+
+  [services.ports.tls_options]
+    alpn = ["h2"]
+
 # adjust memory, cpu to your needs
 [[vm]]
   memory = '512mb' 
