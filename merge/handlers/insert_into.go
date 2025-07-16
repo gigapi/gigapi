@@ -83,7 +83,14 @@ type QueryRequest struct {
 	DB    string `json:"db,omitempty"`
 }
 
+func addCORSHeaders(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+}
+
 func Query(w http.ResponseWriter, r *http.Request) error {
+	addCORSHeaders(w)
 	dbName := r.URL.Query().Get("db")
 	if dbName == "" {
 		//TODO
