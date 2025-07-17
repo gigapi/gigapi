@@ -102,5 +102,9 @@ func InitHandlers(api modules.Api) {
 			return nil
 		},
 	})
-
+	api.RegisterRoute(&modules.Route{
+		Path:    "/kv",
+		Methods: []string{"GET", "POST", "DELETE"},
+		Handler: handlers.KV,
+	})
 }

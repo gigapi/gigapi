@@ -2,8 +2,6 @@ github.com/andybalholm/brotli v1.1.1 h1:PR2pgnyFznKEugtsUo0xLdDop5SKXd5Qf5ysW+7X
 github.com/andybalholm/brotli v1.1.1/go.mod h1:05ib4cKhjx3OQYUY22hTVd34Bc8upXjOLL2rKwwZBoA=
 github.com/apache/arrow-go/v18 v18.3.0 h1:Xq4A6dZj9Nu33sqZibzn012LNnewkTUlfKVUFD/RX/I=
 github.com/apache/arrow-go/v18 v18.3.0/go.mod h1:eEM1DnUTHhgGAjf/ChvOAQbUQ+EPohtDrArffvUjPg8=
-github.com/apache/arrow/go/v14 v14.0.2 h1:N8OkaJEOfI3mEZt07BIkvo4sC6XDbL+48MBPWO5IONw=
-github.com/apache/arrow/go/v14 v14.0.2/go.mod h1:u3fgh3EdgN/YQ8cVQRguVW3R+seMybFg8QBQ5LU+eBY=
 github.com/apache/thrift v0.21.0 h1:tdPmh/ptjE1IJnhbhrcl2++TauVjy242rkV/UzJChnE=
 github.com/apache/thrift v0.21.0/go.mod h1:W1H8aR/QRtYNvrPeFXBtobyRkd0/YVhTc6i07XIAgDw=
 github.com/bsm/ginkgo/v2 v2.12.0 h1:Ny8MWAHyOepLGlLKYmXG4IEkioBysk6GpaRTLC8zwWs=
@@ -40,10 +38,10 @@ github.com/fsnotify/fsnotify v1.7.0 h1:8JEhPFa5W2WU7YfeZzPNqzMP6Lwt7L2715Ggo0nos
 github.com/fsnotify/fsnotify v1.7.0/go.mod h1:40Bi/Hjc2AVfZrqy+aj+yEI+/bRxZnMJyTJwOpGvigM=
 github.com/gigapi/gigapi-config v0.0.9 h1:7VWmMJb2dKGDReasOgu45bzOmrfj/WCiBcO9g4MNgXw=
 github.com/gigapi/gigapi-config v0.0.9/go.mod h1:/hD+d1odWyElSP9++ZPLULXthWHXvx0shNypdbZDYA8=
-github.com/gigapi/gigapi-querier v0.0.22 h1:iseGCKU9MThSTeX+u9ZvZMo4LxEXC6wP8grvmD0+Q20=
-github.com/gigapi/gigapi-querier v0.0.22/go.mod h1:7e7/9ixSGK5DoOCJttoMYeqblx7q27NZzNsoSIZWPC8=
-github.com/gigapi/metadata v0.0.4 h1:kQdreAUyeguIrwSlPukzZ36Y9HlKVhcaBgrg8crK1tY=
-github.com/gigapi/metadata v0.0.4/go.mod h1:LGFPrq9868U3+4S5DdoL1/aU3Ua0mXsRVblXXzCK1i0=
+github.com/gigapi/gigapi-querier v0.0.26 h1:UNEODJZTVZ62JvTYvP2I99rMKLiDF3GKIbfsJi/irwI=
+github.com/gigapi/gigapi-querier v0.0.26/go.mod h1:UgovPqe4klF3dfjqcJBGipXslAcxV8jJpkykCrAu4y4=
+github.com/gigapi/metadata v0.0.5 h1:4A1kIINC9RPqttD9UVLqxgYEDQcha4Y045gGkISbaNI=
+github.com/gigapi/metadata v0.0.5/go.mod h1:LGFPrq9868U3+4S5DdoL1/aU3Ua0mXsRVblXXzCK1i0=
 github.com/go-faster/city v1.0.1 h1:4WAxSZ3V2Ws4QRDrscLEDcibJY8uf41H6AhXDrNDcGw=
 github.com/go-faster/city v1.0.1/go.mod h1:jKcUJId49qdW3L1qKHH/3wPeUstCVpVSXTM6vO3VcTw=
 github.com/go-faster/errors v0.6.1 h1:nNIPOBkprlKzkThvS/0YaX8Zs9KewLCOSFQS5BU06FI=

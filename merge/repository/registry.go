@@ -21,12 +21,27 @@ var conn *sql.DB
 var registry = make(map[[2]string]service.MergeService)
 var mergeTicker *time.Ticker
 var registryMtx sync.Mutex
+var KV metadata.KVStoreIndex
 
 func InitRegistry(_conn *sql.DB) error {
 	if !config.Config.Gigapi.NoMerges {
 		go RunMerge()
 	}
-	return nil
+	err := initKVStore()
+	return err
+}
+
+func initKVStore() error {
+	var err error
+	switch config.Config.Gigapi.Metadata.Type {
+	case "json":
+		KV, err = metadata.NewJSONKVStoreIndex(config.Config.Gigapi.Root)
+	case "redis":
+		KV, err = metadata.NewRedisKVStore(config.Config.Gigapi.Metadata.URL)
+	default:
+		err = fmt.Errorf("unsupported metadata type: %s", config.Config.Gigapi.Metadata.Type)
+	}
+	return err
 }
 
 func GetTable(db string, name string) (service.MergeService, error) {
