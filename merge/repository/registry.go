@@ -35,7 +35,7 @@ func initKVStore() error {
 	var err error
 	switch config.Config.Gigapi.Metadata.Type {
 	case "json":
-		KV, err = metadata.NewJSONKVStoreIndex(config.Config.Gigapi.Root)
+		KV, err = metadata.NewJSONKVStoreIndex(path.Join(config.Config.Gigapi.Root, "kv.json"))
 	case "redis":
 		KV, err = metadata.NewRedisKVStore(config.Config.Gigapi.Metadata.URL)
 	default:
