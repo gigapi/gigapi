@@ -8,7 +8,8 @@ type Api interface {
 }
 
 type Route struct {
-	Path    string
-	Methods []string
-	Handler func(w http.ResponseWriter, r *http.Request) error
+	Path       string
+	PathPrefix string
+	Methods    []string
+	Handler    func(w http.ResponseWriter, r *http.Request) error
 }

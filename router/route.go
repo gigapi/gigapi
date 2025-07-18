@@ -86,7 +86,11 @@ func NewRouter() *mux.Router {
 	for _, r := range handlerRegistry {
 		m := middleware.copy()
 		m.handler = r.Handler
-		router.HandleFunc(r.Path, m.Build()).Methods(r.Methods...)
+		if r.Path != "" {
+			router.HandleFunc(r.Path, m.Build()).Methods(r.Methods...)
+		} else if r.PathPrefix != "" {
+			router.PathPrefix(r.PathPrefix).HandlerFunc(m.Build()).Methods(r.Methods...)
+		}
 	}
 	return router
 }

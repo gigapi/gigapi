@@ -53,6 +53,11 @@ func Init(api modules.Api) {
 		})
 		return nil
 	})
+	api.RegisterRoute(&modules.Route{
+		PathPrefix: "/ui",
+		Methods:    []string{"GET", "OPTIONS"},
+		Handler:    HandleUI,
+	})
 }
 
 func unzipFileToMemFS(memFS afero.Fs, zipFile *zip.File, absPath string) error {
