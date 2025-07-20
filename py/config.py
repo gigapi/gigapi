@@ -2,9 +2,13 @@ from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
-class MetadataConfiguration(BaseModel):
+class MetadataConfiguration(BaseSettings):
     type: str = Field("ducklake", description="Type of metadata storage (json or redis)")
     url: str = Field("", description="Redis URL for metadata storage")
+    class Config:
+        env_prefix = "GIGAPI_METADATA_"
+        env_nested_delimiter = ""
+        extra = "allow"
 
 class BasicAuthConfiguration(BaseModel):
     username: str = Field("", description="Username for basic authentication")
@@ -45,9 +49,7 @@ class Settings(BaseSettings):
         env_nested_delimiter = "_"
         extra = "allow"
 
-
 settings = Settings()
-conf = GigapiConfiguration()
-http = HTTPConfiguration()
-settings.gigapi = conf
-settings.http = http
+settings.gigapi = GigapiConfiguration()
+settings.http = HTTPConfiguration()
+settings.gigapi.metadata = MetadataConfiguration()

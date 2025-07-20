@@ -1,11 +1,21 @@
-import duckdb
+from dotenv import load_dotenv
+load_dotenv()
+
+import uvicorn
 from fastapi import FastAPI
-from sqlalchemy.orm import declarative_base
-from sqlalchemy import Column, String
+from views import reader, writer, middlewares
 
 app = FastAPI()
 
-Base = declarative_base()
+app.add_middleware(middlewares.ErrorHandlerMiddleware)
+
+app.include_router(reader.router)
+app.include_router(writer.router)
 
 if __name__ == "__main__":
-    pass
+    uvicorn.run(
+        "__main__:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True  # Enable auto-reload during development
+    )

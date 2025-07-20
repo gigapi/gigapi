@@ -1,6 +1,9 @@
 import duckdb
-from typing import Tuple, Callable, Optional, Any
+from typing import Tuple, Callable, Optional, Any, AsyncGenerator
 from contextlib import contextmanager, asynccontextmanager
+
+from duckdb.duckdb import DuckDBPyRelation
+
 from config import settings
 from fsspec.implementations import memory
 import asyncio
@@ -16,6 +19,10 @@ class AsyncDuckDBConnection:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, functools.partial(self.conn.execute, query, *args, **kwargs))
 
+    async def aquery(self, *args, **kwargs) -> DuckDBPyRelation:
+        loop = asyncio.get_running_loop()
+        return  await loop.run_in_executor(None, functools.partial(self.conn.query, *args, **kwargs))
+
     def close(self):
         self.conn.close()
 
@@ -27,14 +34,15 @@ def connect_duckdb(conn_str: str = None) -> Tuple[AsyncDuckDBConnection, Callabl
         conn = duckdb.connect(conn_str)
         conn.register_filesystem(memfs)
 
-        if settings.gigapi.metadata.type == "ducklake2":
+        if settings.gigapi.metadata.type == "ducklake":
             # Install the ducklake extension
             conn.execute("INSTALL ducklake;")
             conn.execute("LOAD ducklake;")
 
             # Attach to the 'my_ducklake' database
             ducklake_url = settings.gigapi.metadata.url
-            conn.execute(f"ATTACH 'ducklake:{ducklake_url}' AS my_ducklake;")
+            q = f"ATTACH 'ducklake:{ducklake_url}' AS my_ducklake (DATA_PATH '{settings.gigapi.root}');"
+            conn.execute(q)
             conn.execute("USE my_ducklake;")
 
         if get_duckdb_mem_limit():

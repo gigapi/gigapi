@@ -9,4 +9,4 @@ async def write_json(data: bytes, table: str):
         try:
             await conn.aexecute(f"INSERT INTO {table} SELECT * FROM read_json('memory://{fname}')")
         finally:
-            memfs.remove(fname)
+            memfs.delete(fname)

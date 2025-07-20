@@ -1,15 +1,14 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Query
 from fastapi.responses import JSONResponse
+from services.writer import write_json
 
 router = APIRouter()
 
 @router.post("/write")
-async def write_to_db(request: Request):
-    # Read the raw bytes from the request body
+async def write_to_db(request: Request, table: str = Query(..., description="The table to write to")):
     body = await request.body()
-
-    # Here you would process the byte array (body) as needed
-    # For example, you might want to decode it, parse it, or store it directly
-
-    # For demonstration, let's just return the length of the received data
-    return JSONResponse(content={"received_bytes": len(body)})
+    await write_json(body, table)
+    return JSONResponse(content={
+        "status": "success",
+        "message": f"ok"
+    })
