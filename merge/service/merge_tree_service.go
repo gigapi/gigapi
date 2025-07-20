@@ -330,10 +330,29 @@ type FileDesc struct {
 
 const MERGE_ITERATIONS = 4
 
+type mergeConfiguration [3]int64
+
+func (m mergeConfiguration) timeoutS() int64 {
+	return m[0]
+}
+
+func (m mergeConfiguration) maxResultBytes() int64 {
+	return m[1]
+}
+
+func (m mergeConfiguration) iteration() int64 {
+	return m[2]
+}
+
 // get merge configurations from the overall configuration
 // Each merge configuration is [3]int64 array {timeout in seconds, max result bytes, iteration id}
-func getMergeConfigurations() [][3]int64 {
-	return shared.GetMergeConfigurations()
+func getMergeConfigurations() []mergeConfiguration {
+	_res := shared.GetMergeConfigurations()
+	res := make([]mergeConfiguration, len(_res))
+	for i, v := range _res {
+		res[i] = mergeConfiguration(v)
+	}
+	return res
 }
 
 /*func (s *MergeTreeService) PlanMerge() ([]metadata.MergePlan, error) {

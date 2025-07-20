@@ -1,14 +1,17 @@
 package repository
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"github.com/gigapi/gigapi-config/config"
 	"github.com/gigapi/gigapi/v2/merge/data_types"
 	"github.com/gigapi/gigapi/v2/merge/service"
 	"github.com/gigapi/gigapi/v2/merge/shared"
+	utils2 "github.com/gigapi/gigapi/v2/merge/utils"
 	"github.com/gigapi/gigapi/v2/utils"
 	"github.com/gigapi/metadata"
+	"github.com/google/uuid"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -21,27 +24,23 @@ var conn *sql.DB
 var registry = make(map[[2]string]service.MergeService)
 var mergeTicker *time.Ticker
 var registryMtx sync.Mutex
-var KV metadata.KVStoreIndex
 
 func InitRegistry(_conn *sql.DB) error {
-	if !config.Config.Gigapi.NoMerges {
-		go RunMerge()
-	}
-	err := initKVStore()
-	return err
-}
+	go func() {
+		svc := service.DucklakeMergeService{}
+		t := time.NewTicker(time.Second * 10)
+		for range t.C {
+			err := svc.DoMerge()
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+	}()
 
-func initKVStore() error {
-	var err error
-	switch config.Config.Gigapi.Metadata.Type {
-	case "json":
-		KV, err = metadata.NewJSONKVStoreIndex(path.Join(config.Config.Gigapi.Root, "kv.json"))
-	case "redis":
-		KV, err = metadata.NewRedisKVStore(config.Config.Gigapi.Metadata.URL)
-	default:
-		err = fmt.Errorf("unsupported metadata type: %s", config.Config.Gigapi.Metadata.Type)
-	}
-	return err
+	/*if !config.Config.Gigapi.NoMerges {
+		go RunMerge()
+	}*/
+	return nil
 }
 
 func GetTable(db string, name string) (service.MergeService, error) {
@@ -77,24 +76,28 @@ func RunMerge() {
 var tableNameCheck = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 var m sync.Mutex
 
-func Store(db string, name string, columns map[string]any) utils.Promise[int32] {
-	if db == "" {
-		db = "default"
-	}
-	//TODO: add the thread id to the table name
-	//TODO: introduce Redis to synchronize several writers
-	m.Lock()
-	table := registry[[2]string{db, name}]
-	if table == nil {
-		err := RegisterSimpleTable(db, name)
+func Store(db string, name string, data []byte) utils.Promise[int32] {
+	p := utils.New[int32]()
+	id := uuid.New().String()
+	go func() {
+		utils2.SetInternal(id, bytes.NewReader(data))
+		defer utils2.DelInternal(id)
+		//TODO:
+		db, cancel, err := utils2.ConnectDucklake("my_ducklake")
 		if err != nil {
-			m.Unlock()
-			return utils.Fulfilled(err, int32(0))
+			p.Done(0, err)
+			return
 		}
-		table = registry[[2]string{db, name}]
-	}
-	m.Unlock()
-	return table.Store(columns)
+		defer cancel()
+		q := fmt.Sprintf(
+			"INSERT INTO %s select * from read_json('http://localhost:%d/gigapi/writer/internal?id=%s')",
+			config.Config.HTTP.Port,
+			name, id)
+		_, err = db.Exec(q)
+
+		p.Done(0, err)
+	}()
+	return p
 }
 
 func getTableIndex(table *shared.Table) (metadata.TableIndex, error) {
