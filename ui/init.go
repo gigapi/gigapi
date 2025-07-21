@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"mime"
 	"net/http"
 	"path"
 	"path/filepath"
@@ -47,7 +48,7 @@ func Init(api modules.Api) {
 			return nil
 		}
 		api.RegisterRoute(&modules.Route{
-			Path:    path[len("/dist"):],
+			Path:    "/ui" + path[len("/dist"):],
 			Methods: []string{"GET"},
 			Handler: HandleUI,
 		})
@@ -58,6 +59,7 @@ func Init(api modules.Api) {
 		Methods:    []string{"GET", "OPTIONS"},
 		Handler:    HandleUI,
 	})
+
 }
 
 func unzipFileToMemFS(memFS afero.Fs, zipFile *zip.File, absPath string) error {
@@ -120,6 +122,9 @@ func HandleUI(w http.ResponseWriter, r *http.Request) error {
 	}
 	// Try to serve the requested file
 	requestedPath := r.URL.Path
+	if strings.HasPrefix(requestedPath, "/ui") {
+		requestedPath = requestedPath[3:]
+	}
 	if requestedPath == "/" || requestedPath == "" {
 		content, err := distFS.Open("index.html")
 		if err != nil {
@@ -136,6 +141,11 @@ func HandleUI(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		http.Error(w, "Not found", http.StatusNotFound)
 		return nil
+	}
+	r.URL.Path = requestedPath
+	contentType := mime.TypeByExtension(requestedPath)
+	if contentType != "" {
+		w.Header().Set("Content-Type", contentType)
 	}
 	fileServer.ServeHTTP(w, r)
 	return nil

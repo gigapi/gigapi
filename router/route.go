@@ -83,7 +83,6 @@ func NewRouter() *mux.Router {
 		middleware.withBasicAuth(config.Config.HTTP.BasicAuth.Username, config.Config.HTTP.BasicAuth.Password)
 	}
 	middleware.withErrorHandle()
-	router.StrictSlash(true)
 	for _, r := range handlerRegistry {
 		m := middleware.copy()
 		m.handler = r.Handler
