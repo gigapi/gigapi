@@ -1,12 +1,8 @@
 from duckdb.duckdb import DuckDBPyRelation
-
-from utils.ddb import async_duckdb_connection, AsyncDuckDBConnection
-
-
-
+from utils.ddb import async_ducklake_connection, AsyncDuckDBConnection
 
 async def query(request: str, database: str = None):
-    async with (async_duckdb_connection() as conn):
+    async with (async_ducklake_connection() as conn):
         if database:
             await conn.aexecute(f"USE {database};")
         query_result: DuckDBPyRelation = await conn.aquery(request)

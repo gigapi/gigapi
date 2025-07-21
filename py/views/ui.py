@@ -11,7 +11,6 @@ import mimetypes
 
 router = APIRouter()
 
-# Create a memory file system
 memfs = MemoryFileSystem()
 
 def remDist(file_path: str) -> str:
@@ -30,7 +29,7 @@ with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             continue
         ic(zip_info.filename)
         ic(serve_filename)
-        if zip_info.filename[-1] == '/':  # it's a directory
+        if zip_info.filename[-1] == '/':
             memfs.mkdir(remDist(zip_info.filename))
         else:
             with zip_ref.open(zip_info.filename) as file:

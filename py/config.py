@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
+from typing import Optional, List
 
 class MetadataConfiguration(BaseSettings):
     type: str = Field("ducklake", description="Type of metadata storage (json or redis)")
@@ -53,3 +53,26 @@ settings = Settings()
 settings.gigapi = GigapiConfiguration()
 settings.http = HTTPConfiguration()
 settings.gigapi.metadata = MetadataConfiguration()
+
+class MergeConfiguration:
+    def __init__(self, timeout_s: int, max_result_bytes: int, iteration: int):
+        self._timeout_s = timeout_s
+        self._max_result_bytes = max_result_bytes
+        self._iteration = iteration
+
+    def timeout_s(self) -> int:
+        return self._timeout_s
+
+    def max_result_bytes(self) -> int:
+        return self._max_result_bytes
+
+    def iteration(self) -> int:
+        return self._iteration
+
+def get_merge_configurations() -> List[MergeConfiguration]:
+    return [
+        MergeConfiguration(timeout_s=settings.gigapi.merge_timeout_s, max_result_bytes=100 * 1024 * 1024, iteration=1),
+        MergeConfiguration(timeout_s=settings.gigapi.merge_timeout_s * 10, max_result_bytes=400 * 1024 * 1024, iteration=2),
+        MergeConfiguration(timeout_s=settings.gigapi.merge_timeout_s * 100, max_result_bytes=4000 * 1024 * 1024 * 4, iteration=3),
+        MergeConfiguration(timeout_s=settings.gigapi.merge_timeout_s * 420, max_result_bytes=4000 * 1024 * 1024 * 4, iteration=4),
+    ]

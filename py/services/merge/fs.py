@@ -2,7 +2,7 @@ import os
 import aiohttp
 from typing import List
 from config import settings
-from utils.ddb import async_duckdb_connection
+from utils.ddb import async_ducklake_connection
 
 class FsMergeServicePerformer:
     def __init__(self, data_path: str, table):
@@ -16,7 +16,7 @@ class FsMergeServicePerformer:
         tmp_file_path = os.path.join(self.data_path, merge_plan.to + ".tmp")
         final_file_path = os.path.join(self.data_path, merge_plan.to)
 
-        async with async_duckdb_connection() as conn:
+        async with async_ducklake_connection() as conn:
             create_table_sql = f"""
             COPY (
                 FROM read_parquet(
@@ -32,7 +32,7 @@ class FsMergeServicePerformer:
         os.rename(tmp_file_path, final_file_path)
 
     async def merge_many(self, merge_plan):
-        async with async_duckdb_connection() as conn:
+        async with async_ducklake_connection() as conn:
             await self.install_chsql(conn)
 
             tmp_file_path = os.path.join(self.data_path, merge_plan.to + ".tmp")

@@ -2,7 +2,7 @@ import duckdb
 from typing import Tuple, Callable, Optional, Any, AsyncGenerator
 from contextlib import contextmanager, asynccontextmanager
 
-from duckdb.duckdb import DuckDBPyRelation
+from duckdb.duckdb import DuckDBPyRelation, DuckDBPyConnection
 
 from config import settings
 from fsspec.implementations import memory
@@ -26,13 +26,17 @@ class AsyncDuckDBConnection:
     def close(self):
         self.conn.close()
 
-def connect_duckdb(conn_str: str = None) -> Tuple[AsyncDuckDBConnection, Callable[[], None]]:
+def connect_duckdb(conn_str: str = None) -> DuckDBPyConnection:
     if not conn_str:
         conn_str = get_default_duckdb_conn_str()
+    conn = duckdb.connect(conn_str)
+    conn.register_filesystem(memfs)
+    return conn
+
+def connect_ducklake(conn_str: str = None) -> Tuple[AsyncDuckDBConnection, Callable[[], None]]:
 
     try:
-        conn = duckdb.connect(conn_str)
-        conn.register_filesystem(memfs)
+        conn = connect_duckdb(conn_str)
 
         if settings.gigapi.metadata.type == "ducklake":
             # Install the ducklake extension
@@ -62,11 +66,20 @@ def connect_duckdb(conn_str: str = None) -> Tuple[AsyncDuckDBConnection, Callabl
         raise Exception(f"Failed to connect to DuckDB/Ducklake: {str(e)}")
 
 @asynccontextmanager
+async def async_ducklake_connection(conn_str: str = None):
+    loop = asyncio.get_running_loop()
+    async_conn, cancel = await loop.run_in_executor(None, functools.partial(connect_ducklake, conn_str))
+    try:
+        yield async_conn
+    finally:
+        await loop.run_in_executor(None, cancel)
+
+@asynccontextmanager
 async def async_duckdb_connection(conn_str: str = None):
     loop = asyncio.get_running_loop()
     async_conn, cancel = await loop.run_in_executor(None, functools.partial(connect_duckdb, conn_str))
     try:
-        yield async_conn
+        yield AsyncDuckDBConnection(async_conn)
     finally:
         await loop.run_in_executor(None, cancel)
 
