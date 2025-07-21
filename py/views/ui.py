@@ -27,8 +27,6 @@ with zipfile.ZipFile(zip_path, 'r') as zip_ref:
         serve_filename = remDist(zip_info.filename)
         if not serve_filename:
             continue
-        ic(zip_info.filename)
-        ic(serve_filename)
         if zip_info.filename[-1] == '/':
             memfs.mkdir(remDist(zip_info.filename))
         else:

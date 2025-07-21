@@ -6,13 +6,13 @@ import struct
 import asyncio
 from typing import List, Dict, Any
 from dataclasses import dataclass
-import duckdb
 
 from services.merge.fs import FsMergeServicePerformer
 from services.metadata import MergePlan, Table
 from services.metadata.ducklake.metadata import FileDesc, ColumnDesc, get_files, SCHEMA_NAME, finish_merge
 from config import settings, get_merge_configurations
 from utils.ddb import async_duckdb_connection, AsyncDuckDBConnection
+from .copy_column_ids import copy_column_ids
 
 @dataclass
 class DucklakePlan:
@@ -118,11 +118,12 @@ class DucklakeMergeService:
             record_count=0,
             column_stats=None,
             file_partition_values=None,
-            partition_id=0
+            partition_id=0,
+            size_bytes=0
         )
 
         if p.merge_plan.iteration == 1 or len(p.from_files) > 1:
-            await self.copy_column_ids(
+            copy_column_ids(
                 os.path.join(settings.gigapi.root, SCHEMA_NAME, p.merge_plan.table, p.from_files[0].path),
                 os.path.join(settings.gigapi.root, SCHEMA_NAME, p.merge_plan.table, p.merge_plan.to)
             )
@@ -157,8 +158,8 @@ class DucklakeMergeService:
         maxs = {col: result[i*2+1] for i, col in enumerate(col_names)}
 
         for i, col_stat in enumerate(m.column_stats):
-            col_stat.min = mins[col_stat.name]
-            col_stat.max = maxs[col_stat.name]
+            col_stat.min_value = mins[col_stat.column_name]
+            col_stat.max_value = maxs[col_stat.column_name]
 
     async def get_cols(self, path: str, conn: AsyncDuckDBConnection) -> List[str]:
         result = (await conn.aexecute(f"SELECT name from parquet_schema('{path}') where type is not null")).fetchall()
@@ -178,32 +179,26 @@ class DucklakeMergeService:
 
         col_stats_map = {
             row[0]: ColumnDesc(
-                count=row[2],
+                value_count=row[2],
                 null_count=row[3],
                 contains_nans=False,
-                size_bytes=row[1]
+                column_size_bytes=row[1]
             ) for row in result
         }
 
         for i, col_stat in enumerate(m.column_stats):
-            if col_stat.name in col_stats_map:
-                stats = col_stats_map[col_stat.name]
-                col_stat.count = stats.count
+            if col_stat.column_name in col_stats_map:
+                stats = col_stats_map[col_stat.column_name]
+                col_stat.value_count = stats.value_count
                 col_stat.null_count = stats.null_count
                 col_stat.contains_nans = False
-                col_stat.size_bytes = stats.size_bytes
+                col_stat.column_size_bytes = stats.column_size_bytes
             else:
-                col_stat.count = 0
+                col_stat.value_count = 0
                 col_stat.null_count = 0
                 col_stat.contains_nans = False
-                col_stat.size_bytes = 0
+                col_stat.column_size_bytes = 0
 
     async def populate_file_metadata(self, path: str, conn: AsyncDuckDBConnection, m: FileDesc) -> None:
         result = (await conn.aexecute(f"SELECT num_rows FROM parquet_file_metadata('{path}')")).fetchone()
         m.record_count = result[0]
-
-    async def copy_column_ids(self, src: str, dest: str) -> None:
-        # This is a placeholder implementation. You'll need to implement the actual logic
-        # to copy column IDs from the source Parquet file to the destination Parquet file.
-        # This might involve using a library like pyarrow to read and write Parquet metadata.
-        pass

@@ -3,69 +3,38 @@ import struct
 from fastparquet import ParquetFile
 from fastparquet.parquet_thrift import FileMetaData
 from icecream import ic
+import copy
 
-def custom_thrift_copy(obj):
-    if isinstance(obj, (int, float, str, bool, type(None))):
-        return obj
-    elif isinstance(obj, list):
-        return [custom_thrift_copy(item) for item in obj]
-    elif isinstance(obj, dict):
-        return {k: custom_thrift_copy(v) for k, v in obj.items()}
-    else:
-        # For Thrift objects
-        new_obj = obj.__class__()
-        for key in obj.__dict__:
-            if not key.startswith('_'):
-                setattr(new_obj, key, custom_thrift_copy(getattr(obj, key)))
-        return new_obj
-
-async def copy_column_ids(src: str, dest: str) -> None:
+def copy_column_ids(src: str, dest: str) -> None:
     # Read the source file's metadata
     src_pf = ParquetFile(src)
-    src_metadata = src_pf.metadata
-    ic(src_metadata.schema)
-    return
-
+    src_metadata = src_pf.fmd
     # Read the destination file's metadata
     dest_pf = ParquetFile(dest)
-    dest_metadata = dest_pf.metadata
+    dest_metadata = dest_pf.fmd
 
     # Copy the schema from source to destination
-    dest_metadata.schema = custom_thrift_copy(src_metadata.schema)
+    dest_metadata.schema = copy.copy(src_metadata.schema)
+    ic(dest_metadata)
 
     # Serialize the updated metadata
-    footer_data = FileMetaData().write(dest_metadata)
+    ic(dest_metadata.to_bytes())
 
     # Write the updated metadata back to the destination file
     with open(dest, 'r+b') as f:
         # Go to the end of the file
         f.seek(0, 2)
         file_length = f.tell()
+        f.seek(-8, 2)
+        footer_metadata = f.read(8)
+        footer_size_bytes = struct.unpack('<I', footer_metadata[:4])[0]
+        f.seek(-1 * footer_size_bytes, 2)
 
         # Write the new footer
+        footer_data = dest_metadata.to_bytes()
         f.write(footer_data)
 
         # Write the footer length (4 bytes) and "PAR1" magic bytes
         footer_length = len(footer_data)
         f.write(struct.pack('<I', footer_length))
         f.write(b'PAR1')
-
-        # Update file size
-        new_file_length = f.tell()
-
-    # Update the Parquet file metadata
-    dest_pf.metadata.footer_size = footer_length
-    dest_pf._file_size = new_file_length
-
-    print(f"Updated footer for {dest}. New file size: {new_file_length}, Footer size: {footer_length}")
-
-import asyncio
-
-async def main():
-    await copy_column_ids(
-        "/home/hromozeka/QXIP/quackpipe/_testdata/main/test/ducklake-01982819-8f99-7079-9748-5fcb9e492a49.parquet",
-        "/home/hromozeka/QXIP/quackpipe/_testdata/main/test/ducklake-01982819-8f99-7079-9748-5fcb9e492a49_copy.parquet"
-    )
-
-if __name__ == "__main__":
-    asyncio.run(main())

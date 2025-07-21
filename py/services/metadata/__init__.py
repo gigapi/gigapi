@@ -2,10 +2,10 @@ from pydantic import BaseModel, Field
 from typing import List, Callable, Dict, Any, Optional
 
 class MergePlan(BaseModel):
-    id: str
-    writer_id: str
-    layer: str
-    database: str
+    # id: str
+    # writer_id: str
+    # layer: str
+    # database: str
     table: str
     from_paths: List[str]
     to: str
@@ -23,13 +23,13 @@ class MergePlan(BaseModel):
 # }
 
 class Table(BaseModel):
-    database: str
-    name: str
-    path: str
-    engine: str
-    order_by: List[str] = Field(alias="OrderBy")
+    # database: str
+    # name: str
+    # path: str
+    # engine: str
+    order_by: List[str]
     # partition_by: Optional[Callable[[Dict[str, IColumn]], List[PartitionDesc]]] = Field(alias="PartitionBy")
-    auto_timestamp: bool = Field(alias="AutoTimestamp")
+    auto_timestamp: bool = False
     # index: TableIndex
 
     class Config:

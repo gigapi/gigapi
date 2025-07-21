@@ -77,11 +77,11 @@ async def async_ducklake_connection(conn_str: str = None):
 @asynccontextmanager
 async def async_duckdb_connection(conn_str: str = None):
     loop = asyncio.get_running_loop()
-    async_conn, cancel = await loop.run_in_executor(None, functools.partial(connect_duckdb, conn_str))
+    conn = connect_duckdb(conn_str)
     try:
-        yield AsyncDuckDBConnection(async_conn)
+        yield AsyncDuckDBConnection(conn)
     finally:
-        await loop.run_in_executor(None, cancel)
+        conn.close()
 
 def get_duckdb_mem_limit() -> Optional[str]:
     return None

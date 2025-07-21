@@ -54,6 +54,22 @@ settings.gigapi = GigapiConfiguration()
 settings.http = HTTPConfiguration()
 settings.gigapi.metadata = MetadataConfiguration()
 
+def postgres_connection_dict():
+    res = {
+        "host": "localhost",
+        "port": 5432,
+        "user": "postgres",
+        "password": "password",
+        "database": "mydb"
+    }
+    parts = [part.split('=') for part in settings.gigapi.metadata.url[9:].split(" ")]
+    for k, v in parts:
+        if k == "dbname":
+            res["database"] = v
+        else:
+            res[k] = v
+    return res
+
 class MergeConfiguration:
     def __init__(self, timeout_s: int, max_result_bytes: int, iteration: int):
         self._timeout_s = timeout_s

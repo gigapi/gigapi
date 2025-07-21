@@ -21,16 +21,16 @@ services:
     volumes:
       - ./_data/minio:/data
 
-  gigapi:
-    build: ../
-    network_mode: host
-    volumes:
-      - ./_data/gigapi:/data
-    environment:
-      GIGAPI_MERGE_TIMEOUT_S: 10
-      GIGAPI_ROOT: /data
-      POSTGRES_USER: myuser
-      POSTGRES_PASSWORD: mypassword
-      POSTGRES_HOST: localhost
-      POSTGRES_PORT: 5432
-      POSTGRES_DB: mydb
+  # gigapi:
+  #   build: ../
+  #   network_mode: host
+  #   volumes:
+  #     - ./_data/gigapi:/data
+  #   environment:
+  #     GIGAPI_MERGE_TIMEOUT_S: 10
+  #     GIGAPI_ROOT: /data
+  #     POSTGRES_USER: myuser
+  #     POSTGRES_PASSWORD: mypassword
+  #     POSTGRES_HOST: localhost
+  #     POSTGRES_PORT: 5432
+  #     POSTGRES_DB: mydb

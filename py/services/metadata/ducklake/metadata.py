@@ -4,7 +4,7 @@ from typing import List, Optional
 import asyncpg
 from pydantic import BaseModel
 
-from config import settings
+from config import settings, postgres_connection_dict
 from services.metadata.ducklake.file_seeker import FileSeeker
 
 mdb = None
@@ -14,12 +14,9 @@ async def get_metadata_db():
     if mdb is not None:
         return mdb
 
-    conn_str = settings.postgres_connection_string
-    if not conn_str:
-        logging.fatal("POSTGRES environment variables is not set")
-
+    conn_dict = postgres_connection_dict()
     try:
-        mdb = await asyncpg.connect(conn_str)
+        mdb = await asyncpg.connect(**conn_dict)
         return mdb
     except Exception as e:
         logging.error(f"Failed to connect to database: {str(e)}")
@@ -32,10 +29,10 @@ class TableDesc(BaseModel):
     order_by: List[str]
 
 class ColumnDesc(BaseModel):
-    column_id: int
-    column_name: str
-    min_value: str
-    max_value: str
+    column_id: int = 0
+    column_name: str = ""
+    min_value: str = ""
+    max_value: str = ""
     value_count: int
     null_count: int
     contains_nans: bool
@@ -52,8 +49,8 @@ class FileDesc(BaseModel):
     size_bytes: int
     footer_size_bytes: int
     record_count: int
-    column_stats: List[ColumnDesc]
-    file_partition_values: List[FilePartitionValue]
+    column_stats: Optional[List[ColumnDesc]]
+    file_partition_values: Optional[List[FilePartitionValue]]
     partition_id: int
 
 async def get_files(table: str, iteration: int, with_stats: bool) -> List[FileDesc]:
@@ -64,8 +61,7 @@ async def get_files(table: str, iteration: int, with_stats: bool) -> List[FileDe
     seeker.with_stats = with_stats
     query, args = seeker.build()
 
-    async with db.transaction():
-        rows = await db.fetch(query, *args)
+    rows = await db.fetch(query, *args)
 
     files = []
     for row in rows:
