@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	_ "embed"
+	"errors"
 	"github.com/gigapi/gigapi-config/config"
 	"github.com/gigapi/gigapi/v2/modules"
 	"github.com/spf13/afero"
@@ -41,7 +42,15 @@ func Init(api modules.Api) {
 	api.RegisterRoute(&modules.Route{
 		Path:    "/",
 		Methods: []string{"GET", "OPTIONS"},
-		Handler: HandleUI,
+		Handler: func(w http.ResponseWriter, r *http.Request) error {
+			addCORSHeaders(w)
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return nil
+			}
+			http.Redirect(w, r, "/ui/", http.StatusFound)
+			return nil
+		},
 	})
 	afero.Walk(UIFS, "/", func(path string, d fs.FileInfo, err error) error {
 		if d == nil || len(path) <= 5 {
@@ -130,6 +139,14 @@ func HandleUI(w http.ResponseWriter, r *http.Request) error {
 	if strings.HasPrefix(requestedPath, "/ui") {
 		requestedPath = requestedPath[3:]
 	}
+	// Check if file exists in embedded FS
+	_, err := distFS.Stat(path.Clean(requestedPath))
+	if errors.Is(err, fs.ErrNotExist) {
+		requestedPath = "/"
+	} else if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return nil
+	}
 	if requestedPath == "/" || requestedPath == "" {
 		content, err := distFS.Open("index.html")
 		if err != nil {
@@ -141,12 +158,7 @@ func HandleUI(w http.ResponseWriter, r *http.Request) error {
 		io.Copy(w, content)
 		return nil
 	}
-	// Check if file exists in embedded FS
-	_, err := distFS.Stat(path.Clean(requestedPath))
-	if err != nil {
-		http.Error(w, "Not found", http.StatusNotFound)
-		return nil
-	}
+
 	r.URL.Path = requestedPath
 	contentType := mime.TypeByExtension(requestedPath)
 	if contentType != "" {
