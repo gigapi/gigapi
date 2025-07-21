@@ -52,6 +52,11 @@ func Init(api modules.Api) {
 			Methods: []string{"GET"},
 			Handler: HandleUI,
 		})
+		api.RegisterRoute(&modules.Route{
+			Path:    path[len("/dist"):],
+			Methods: []string{"GET"},
+			Handler: HandleUI,
+		})
 		return nil
 	})
 	api.RegisterRoute(&modules.Route{
