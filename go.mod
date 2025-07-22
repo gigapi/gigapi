@@ -6,7 +6,7 @@ require (
 	github.com/apache/arrow-go/v18 v18.3.0
 	github.com/expr-lang/expr v1.17.2
 	github.com/gigapi/gigapi-config v0.0.9
-	github.com/gigapi/gigapi-querier v0.0.26
+	github.com/gigapi/gigapi-querier v0.0.27
 	github.com/gigapi/metadata v0.0.6
 	github.com/go-faster/city v1.0.1
 	github.com/go-faster/jx v1.1.0
