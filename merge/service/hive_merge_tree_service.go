@@ -503,3 +503,7 @@ func (m *MultithreadHiveMergeTreeService) Store(columns map[string]any) utils.Pr
 func (m *MultithreadHiveMergeTreeService) DoMerge() error {
 	return m.svcs[0].DoMerge()
 }
+
+func (m *MultithreadHiveMergeTreeService) GetTable() *shared.Table {
+	return m.svcs[0].Table
+}

@@ -2,6 +2,8 @@ module github.com/gigapi/gigapi/v2
 
 go 1.24.2
 
+replace github.com/gigapi/metadata v0.0.6 => ../metadata
+
 require (
 	github.com/apache/arrow-go/v18 v18.3.0
 	github.com/expr-lang/expr v1.17.2
@@ -13,9 +15,11 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/influxdata/influxdb v1.12.0
+	github.com/jmoiron/sqlx v1.4.0
 	github.com/marcboeker/go-duckdb/v2 v2.2.0
 	github.com/minio/minio-go/v7 v7.0.91
 	github.com/spf13/afero v1.12.0
+	github.com/tliron/py4go v0.0.0-20250217190551-2a45aeb39bc7
 	golang.org/x/exp v0.0.0-20250128182459-e0ece0dbea4c
 	golang.org/x/sync v0.14.0
 )
@@ -57,6 +61,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.1.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/redis/go-redis/v9 v9.8.0 // indirect
+	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect

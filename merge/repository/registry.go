@@ -12,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sync"
 	"time"
 )
@@ -19,11 +20,32 @@ import (
 var conn *sql.DB
 
 var registry = make(map[[2]string]service.MergeService)
+var dbIndex metadata.DBIndex
 var mergeTicker *time.Ticker
 var registryMtx sync.Mutex
 var KV metadata.KVStoreIndex
 
-func InitRegistry(_conn *sql.DB) error {
+func InitRegistry() error {
+	layers := make([]metadata.Layer, len(config.Config.Gigapi.Layers))
+	for i, l := range config.Config.Gigapi.Layers {
+		layers[i] = metadata.Layer{
+			Name:   l.Name,
+			Type:   l.Type,
+			URL:    l.URL,
+			TTLSec: int32(l.TTL.Seconds()),
+		}
+	}
+	switch config.Config.Gigapi.Metadata.Type {
+	case "json":
+		dbIndex = metadata.NewJSONDBIndex(layers)
+	case "redis":
+		var err error
+		dbIndex, err = metadata.NewRedisDbIndex(config.Config.Gigapi.Metadata.URL)
+		if err != nil {
+			return err
+		}
+	}
+
 	if !config.Config.Gigapi.NoMerges {
 		go RunMerge()
 	}
@@ -44,12 +66,29 @@ func initKVStore() error {
 	return err
 }
 
-func GetTable(db string, name string) (service.MergeService, error) {
-	table, ok := registry[[2]string{db, name}]
-	if !ok {
-		return nil, fmt.Errorf("table %q not found", name)
+var DBNotFoundError error = fmt.Errorf("database not found")
+var TableNotFoundError error = fmt.Errorf("table not found")
+
+func GetTableIndex(db string, name string) (metadata.TableIndex, error) {
+	dbs, err := dbIndex.Databases()
+	if err != nil {
+		return nil, err
 	}
-	return table, nil
+	if !slices.Contains(dbs, db) {
+		return nil, DBNotFoundError
+	}
+	tables, err := dbIndex.Tables(db)
+	if err != nil {
+		return nil, err
+	}
+	if !slices.Contains(tables, name) {
+		return nil, TableNotFoundError
+	}
+	table, ok := registry[[2]string{db, name}]
+	if ok {
+		return table.(*service.MultithreadHiveMergeTreeService).GetTable().Index, nil
+	}
+	return getTableIndex(&shared.Table{Database: db, Name: name})
 }
 
 func RunMerge() {

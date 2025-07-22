@@ -1,0 +1,2 @@
+query-farm-sql-scan-planning==0.1.6
+icecream==2.1.5

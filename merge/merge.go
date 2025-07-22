@@ -3,6 +3,7 @@ package merge
 import (
 	"github.com/gigapi/gigapi-config/config"
 	"github.com/gigapi/gigapi/v2/merge/handlers"
+	"github.com/gigapi/gigapi/v2/merge/reader"
 	"github.com/gigapi/gigapi/v2/merge/repository"
 	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/gigapi/gigapi/v2/merge/utils"
@@ -40,7 +41,7 @@ func Init(api modules.Api) {
 		panic(err)
 	}
 
-	err = repository.InitRegistry(conn)
+	err = repository.InitRegistry()
 	if err != nil {
 		panic(err)
 	}
@@ -106,5 +107,10 @@ func InitHandlers(api modules.Api) {
 		Path:    "/kv",
 		Methods: []string{"GET", "POST", "DELETE"},
 		Handler: handlers.KV,
+	})
+	api.RegisterRoute(&modules.Route{
+		Path:    "/query",
+		Methods: []string{"POST"},
+		Handler: reader.Query,
 	})
 }
