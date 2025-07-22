@@ -6,21 +6,15 @@ from pydantic import BaseModel
 
 from config import settings, postgres_connection_dict
 from services.metadata.ducklake.file_seeker import FileSeeker
+from icecream import ic
 
 mdb = None
 
 async def get_metadata_db():
-    global mdb
-    if mdb is not None:
-        return mdb
 
     conn_dict = postgres_connection_dict()
-    try:
-        mdb = await asyncpg.connect(**conn_dict)
-        return mdb
-    except Exception as e:
-        logging.error(f"Failed to connect to database: {str(e)}")
-        raise
+    mdb = await asyncpg.connect(**conn_dict)
+    return mdb
 
 class TableDesc(BaseModel):
     id: int
@@ -65,6 +59,7 @@ async def get_files(table: str, iteration: int, with_stats: bool) -> List[FileDe
 
     files = []
     for row in rows:
+        ic(row)
         file = FileDesc(
             id=row['file_id'],
             table=TableDesc(
@@ -147,6 +142,9 @@ async def finish_merge(delete: List[FileDesc], add: List[FileDesc], table: Table
 
         for file in add:
             column_desc = json.dumps([col.dict() for col in file.column_stats])
+            ic(file)
+            ic(file.file_partition_values)
+            file_partition_values = json.dumps([partition_value.__dict__ for partition_value in file.file_partition_values])
             await db.execute(
                 """
                 WITH a AS (
@@ -198,8 +196,18 @@ async def finish_merge(delete: List[FileDesc], add: List[FileDesc], table: Table
                     FROM
                         json_array_elements($8::json) AS elem
                     RETURNING *
+                ),
+                f AS (
+                    INSERT INTO ducklake_file_partition_value
+                    SELECT 
+                        (SELECT max(next_file_id) - 1 FROM a) as data_file_id,
+                        $4 as table_id,
+                        (elem->>'partition_key_index')::int8 as partition_key_index,
+                        (elem->>'partition_value')::text as partition_value
+                    FROM json_array_elements($9::json) AS elem
+                    RETURNING *
                 )
-                SELECT * FROM e;
+                SELECT * FROM f;
                 """,
                 str(table.id),
                 file.record_count,
@@ -208,5 +216,6 @@ async def finish_merge(delete: List[FileDesc], add: List[FileDesc], table: Table
                 file.path,
                 file.footer_size_bytes,
                 file.partition_id,
-                column_desc
+                column_desc,
+                file_partition_values #TODO
             )

@@ -117,7 +117,7 @@ class DucklakeMergeService:
             footer_size_bytes=0,
             record_count=0,
             column_stats=None,
-            file_partition_values=None,
+            file_partition_values=p.from_files[0].file_partition_values,
             partition_id=0,
             size_bytes=0
         )
