@@ -10,7 +10,7 @@ class CustomDuckDBDialect(sqlglot.dialects.DuckDB):
     class Parser(sqlglot.dialects.DuckDB.Parser):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
-            for f in ["EPOCH", "EPOCH_MS", "ARRAY"]:
+            for f in ["EPOCH", "EPOCH_MS", "ARRAY", "TIME_BUCKET", "TO_TIMESTAMP"]:
                 if f in self.FUNCTIONS:
                     del self.FUNCTIONS[f]
 
@@ -36,7 +36,7 @@ def inject(query, metadata_json):
                 has_nulls=False,
                 has_non_nulls=True
         )}) for f in json.loads(metadata_json)]
-        res = sqlglot.parse_one(query, dialect=CustomDuckDBDialect)
+        res = sqlglot.parse_one(query)
         frm = None
         whr = None
         for node in res.walk():
@@ -50,7 +50,7 @@ def inject(query, metadata_json):
         else:
             matching_files = set([x[0] for x in metadata])
         q = "FROM read_parquet(ARRAY[%s])" % ",".join([f"'{f}'" for f in matching_files])
-        frm2 = sqlglot.parse_one(q, dialect="duckdb")
+        frm2 = sqlglot.parse_one(q)
         for node in frm2.walk():
             if isinstance(node, sqlglot.expressions.From):
                 frm.this.this.replace(node.this.this)
