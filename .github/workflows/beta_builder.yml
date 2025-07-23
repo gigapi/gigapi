@@ -1,5 +1,9 @@
 name: Beta Container Builder
 
+permissions:
+  contents: read
+  packages: write
+
 on:
   push:
     branches:
@@ -51,4 +55,4 @@ jobs:
       with:
         context: .
         push: true
-        tags: ${{ inputs.tag || 'smart-querier' }} 
+        tags: ${{ env.DOCKER_REPO }}:${{ inputs.tag || 'smart-querier' }} 
