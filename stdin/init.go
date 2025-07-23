@@ -2,6 +2,7 @@ package stdin
 
 import (
 	"bufio"
+	"context"
 	"flag"
 	"fmt"
 	"github.com/gigapi/gigapi/v2/merge/utils"
@@ -36,13 +37,13 @@ func processStdin() {
 		panic(fmt.Sprintf("Error reading from stdin: %v", err))
 	}
 
-	db, cancel, err := utils.ConnectDuckDB("?access_mode=READ_WRITE&allow_unsigned_extensions=1")
+	db, cancel, err := utils.ConnectDuckDB("")
 	if err != nil {
 		panic(fmt.Sprintf("Error connecting to DuckDB: %v", err))
 	}
 	defer cancel()
 
-	_, err = db.Exec(string(content))
+	_, err = db.ExecContext(context.Background(), string(content))
 	if err != nil {
 		panic(fmt.Sprintf("Error executing SQL: %v", err))
 	}

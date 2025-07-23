@@ -1,20 +1,47 @@
 package utils
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
+	"github.com/gigapi/gigapi-config/config"
+	"github.com/jmoiron/sqlx"
 	_ "github.com/marcboeker/go-duckdb/v2" // load duckdb driver
 	"os"
 	"strconv"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
+var dbMap = make(map[string]*sqlx.DB)
+var dbMtx sync.Mutex
+
+func getDb(path string) (*sqlx.DB, error) {
+	dbMtx.Lock()
+	defer dbMtx.Unlock()
+	db := dbMap[path]
+	if db != nil {
+		return db, nil
+	}
+	db, err := sqlx.Open("duckdb", path)
+	if err != nil {
+		return nil, err
+	}
+	_, err = db.Exec("SET memory_limit='" + getDuckDBMemLimit() + "'")
+	if err != nil {
+		return nil, err
+	}
+	_, err = db.Exec(fmt.Sprintf("SET threads TO %d", getDuckDBThreadLimit()))
+	if err != nil {
+		return nil, err
+	}
+	dbMap[path] = db
+	return db, nil
+}
+
 var poolMap sync.Map
 
-type dbWrapper struct {
-	*sql.DB
+type connWrapper struct {
+	*sqlx.Conn
 	initedAt time.Time
 }
 
@@ -22,7 +49,7 @@ var dbHeld int32
 var poolSize int32
 
 const (
-	DEFAULT_MEM_LIMIT      = "1GB"
+	DEFAULT_MEM_LIMIT       = "1GB"
 	DEFAULT_DB_THREAD_LIMIT = 1
 )
 
@@ -57,41 +84,26 @@ func getDuckDBThreadLimit() int {
 
 }*/
 
+func getDefaultFilePath() string {
+	return fmt.Sprintf("%s?access_mode=READ_WRITE&allow_unsigned_extensions=1",
+		config.Config.Gigapi.DefaultDatabase)
+}
+
 // ConnectDuckDB opens and returns a connection to DuckDB.
-func ConnectDuckDB(filePath string) (*sql.DB, func(), error) {
+func ConnectDuckDB(filePath string) (*sqlx.Conn, func(), error) {
 	// Open DuckDB connection (this will create a DuckDB instance in the specified file)
-	pool, _ := poolMap.LoadOrStore(filePath, &sync.Pool{})
-	db := pool.(*sync.Pool).Get()
-	cancel := func() {
-		atomic.AddInt32(&dbHeld, -1)
-		if time.Now().Sub(db.(*dbWrapper).initedAt).Minutes() > 5 || atomic.LoadInt32(&poolSize) > 5 {
-			db.(*dbWrapper).Close()
-			return
-		}
-		atomic.AddInt32(&poolSize, 1)
-		pool.(*sync.Pool).Put(db.(*dbWrapper))
+	if filePath == "" {
+		filePath = getDefaultFilePath()
 	}
-	if db != nil {
-		atomic.AddInt32(&poolSize, -1)
-		atomic.AddInt32(&dbHeld, 1)
-		// Set baseline DuckDB settings
-		_, _ = db.(*dbWrapper).Exec("SET memory_limit='" + getDuckDBMemLimit() + "'")
-		_, _ = db.(*dbWrapper).Exec(fmt.Sprintf("SET threads TO %d", getDuckDBThreadLimit()))
-		return db.(*dbWrapper).DB, cancel, nil
-	}
-	db, err := sql.Open("duckdb", filePath)
+	db, err := getDb(filePath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open DuckDB: %w", err)
+		return nil, nil, err
 	}
-	db = &dbWrapper{db.(*sql.DB), time.Now()}
-	// Test the connection
-	if err = db.(*dbWrapper).Ping(); err != nil {
-		db.(*dbWrapper).Close()
-		return nil, nil, fmt.Errorf("failed to connect to DuckDB: %w", err)
+	conn, err := db.Connx(context.Background())
+	if err != nil {
+		return nil, nil, err
 	}
-	// Set baseline DuckDB settings
-	_, _ = db.(*dbWrapper).Exec("SET memory_limit='" + getDuckDBMemLimit() + "'")
-	_, _ = db.(*dbWrapper).Exec(fmt.Sprintf("SET threads TO %d", getDuckDBThreadLimit()))
-	atomic.AddInt32(&dbHeld, 1)
-	return db.(*dbWrapper).DB, cancel, nil
+	return conn, func() {
+		conn.Close()
+	}, nil
 }

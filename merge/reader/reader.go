@@ -1,6 +1,7 @@
 package reader
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -59,13 +60,12 @@ func Query(w http.ResponseWriter, r *http.Request) error {
 		db = "default"
 	}
 
-	conn, cancel, err := utils.ConnectDuckDB("?access_mode=READ_WRITE&allow_unsigned_extensions=1")
+	connx, cancel, err := utils.ConnectDuckDB("")
 	if err != nil {
 		return err
 	}
 	defer cancel()
 
-	connx := sqlx.NewDb(conn, "duckdb")
 	var rows []map[string]any
 	if strings.ToLower(query.Query) == "show databases" {
 		rows, err = doShowDatabases(connx)
@@ -169,7 +169,7 @@ func injectParquet(query string, db string) (string, error) {
 	return queryWithRightFrom, nil
 }
 
-func doShowDatabases(conn *sqlx.DB) ([]map[string]any, error) {
+func doShowDatabases(conn *sqlx.Conn) ([]map[string]any, error) {
 	entries, err := repository2.DBIndex.Databases()
 	if err != nil {
 		return nil, err
@@ -180,7 +180,7 @@ func doShowDatabases(conn *sqlx.DB) ([]map[string]any, error) {
 			"database_name": entry,
 		})
 	}
-	rows, err := conn.Queryx("SHOW DATABASES")
+	rows, err := conn.QueryxContext(context.Background(), "SHOW DATABASES")
 	if err != nil {
 		return nil, err
 	}
@@ -193,9 +193,9 @@ func doShowDatabases(conn *sqlx.DB) ([]map[string]any, error) {
 	return results, nil
 }
 
-func doQuery(connx *sqlx.DB, queryWithRightFrom string) ([]map[string]any, error) {
+func doQuery(connx *sqlx.Conn, queryWithRightFrom string) ([]map[string]any, error) {
 	var res []map[string]any
-	rows, err := connx.Queryx(queryWithRightFrom)
+	rows, err := connx.QueryxContext(context.Background(), queryWithRightFrom)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +214,7 @@ func doQuery(connx *sqlx.DB, queryWithRightFrom string) ([]map[string]any, error
 
 var showTablesRe = regexp.MustCompile(`SHOW\s+TABLES(\s+FROM\s+([a-zA-Z_][a-zA-Z0-9_]*))?`)
 
-func doShowTables(connx *sqlx.DB, query string, db string) ([]map[string]any, error) {
+func doShowTables(connx *sqlx.Conn, query string, db string) ([]map[string]any, error) {
 	// Match the query against the regular expression
 	matches := showTablesRe.FindStringSubmatch(query)
 
@@ -240,7 +240,7 @@ func doShowTables(connx *sqlx.DB, query string, db string) ([]map[string]any, er
 		return res, nil
 	}
 
-	rows, err := connx.Queryx(query)
+	rows, err := connx.QueryxContext(context.Background(), query)
 	if err != nil {
 		return nil, err
 	}

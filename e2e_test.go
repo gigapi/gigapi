@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gigapi/gigapi-config/config"
@@ -288,7 +289,8 @@ func TestMetadataFiles(t *testing.T) {
 		for _, f := range pData.Files {
 			pqts = append(pqts, "'"+f.Path+"'")
 		}
-		rows, err := db.Query(fmt.Sprintf("SELECT COUNT(*) FROM read_parquet([%s])", strings.Join(pqts, ",")))
+		rows, err := db.QueryContext(context.Background(),
+			fmt.Sprintf("SELECT COUNT(*) FROM read_parquet([%s])", strings.Join(pqts, ",")))
 		if err != nil {
 			panic(err)
 		}

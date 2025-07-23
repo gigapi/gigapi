@@ -1,8 +1,9 @@
 package repository
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
+	"github.com/jmoiron/sqlx"
 	"sync"
 )
 
@@ -10,7 +11,7 @@ var dbMtx sync.Mutex
 
 // TODO: Implement the incremental initialization of TablesTable
 
-func CreateDuckDBTablesTable(db *sql.DB) error {
+func CreateDuckDBTablesTable(db *sqlx.Conn) error {
 	// Adjusted schema using DuckDB's ARRAY type
 	query := `
 	CREATE TABLE IF NOT EXISTS tables (
@@ -28,7 +29,7 @@ func CreateDuckDBTablesTable(db *sql.DB) error {
 	`
 
 	// Execute the query to create the table if it doesn't exist
-	_, err := db.Exec(query)
+	_, err := db.ExecContext(context.Background(), query)
 	if err != nil {
 		return fmt.Errorf("failed to create 'tables' table in DuckDB: %v", err)
 	}

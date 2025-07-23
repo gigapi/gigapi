@@ -3,12 +3,12 @@ package service
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"fmt"
 	"github.com/gigapi/gigapi-config/config"
 	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/gigapi/gigapi/v2/merge/utils"
 	"github.com/gigapi/metadata"
+	"github.com/jmoiron/sqlx"
 	"io"
 	"net/http"
 	"os"
@@ -81,14 +81,14 @@ func downloadToTempFile(url string, fname string) (string, error) {
 	return tmpFile.Name(), nil
 }
 
-func installChSql(db *sql.DB) error {
+func installChSql(db *sqlx.Conn) error {
 	if CHSQL_EXT_URL == "community" {
-		_, err := db.Exec("INSTALL chsql FROM community")
+		_, err := db.ExecContext(context.Background(), "INSTALL chsql FROM community")
 		if err != nil {
 			return fmt.Errorf("failed to install chsql extension: %w", err)
 		}
 
-		_, err = db.Exec("LOAD chsql")
+		_, err = db.ExecContext(context.Background(), "LOAD chsql")
 		return err
 	}
 
@@ -96,7 +96,7 @@ func installChSql(db *sql.DB) error {
 		ver  string
 		arch string
 	)
-	row := db.QueryRow("SELECT version()")
+	row := db.QueryRowContext(context.Background(), "SELECT version()")
 	if row == nil {
 		return fmt.Errorf("failed to get version")
 	}
@@ -105,7 +105,7 @@ func installChSql(db *sql.DB) error {
 		return fmt.Errorf("failed to scan version: %w", err)
 	}
 
-	row = db.QueryRow("PRAGMA platform")
+	row = db.QueryRowContext(context.Background(), "PRAGMA platform")
 	if row == nil {
 		return fmt.Errorf("failed to get platform")
 	}
@@ -128,12 +128,12 @@ func installChSql(db *sql.DB) error {
 
 	fname, err := downloadToTempFile(chsqlURL, "chsql.duckdb_extension")
 
-	_, err = db.Exec(fmt.Sprintf("INSTALL '%s'", fname))
+	_, err = db.ExecContext(context.Background(), fmt.Sprintf("INSTALL '%s'", fname))
 	if err != nil {
 		return fmt.Errorf("failed to install chsql extension: %w", err)
 	}
 
-	_, err = db.Exec("LOAD 'chsql'")
+	_, err = db.ExecContext(context.Background(), "LOAD 'chsql'")
 	return err
 }
 
@@ -151,7 +151,7 @@ func (f *fsMergeServicePerformer) mergeFirstIteration(p metadata.MergePlan) erro
 
 	tmpFilePath := filepath.Join(f.tmpPath, filepath.Base(p.To))
 	finalFilePath := filepath.Join(f.dataPath, p.To)
-	conn, cancel, err := utils.ConnectDuckDB("?access_mode=READ_WRITE&allow_unsigned_extensions=1")
+	conn, cancel, err := utils.ConnectDuckDB("")
 	if err != nil {
 		return err
 	}
@@ -160,7 +160,7 @@ func (f *fsMergeServicePerformer) mergeFirstIteration(p metadata.MergePlan) erro
 		`COPY(FROM read_parquet(ARRAY['%s'], hive_partitioning = false, union_by_name = true) ORDER BY %s)TO '%s' (FORMAT 'parquet')`,
 		strings.Join(f.getAbsPaths(p.From), "','"),
 		strings.Join(f.table.OrderBy, " ASC,")+" ASC", tmpFilePath)
-	_, err = conn.Exec(createTableSQL)
+	_, err = conn.ExecContext(context.Background(), createTableSQL)
 	if err != nil {
 		fmt.Println(createTableSQL)
 		fmt.Println("Error read_parquet_mergetree: ", err)
@@ -176,7 +176,7 @@ func (f *fsMergeServicePerformer) mergeFirstIteration(p metadata.MergePlan) erro
 }
 
 func (f *fsMergeServicePerformer) mergeMany(p metadata.MergePlan) error {
-	conn, cancel, err := utils.ConnectDuckDB("?access_mode=READ_WRITE&allow_unsigned_extensions=1")
+	conn, cancel, err := utils.ConnectDuckDB("")
 	if err != nil {
 		return err
 	}
@@ -199,7 +199,7 @@ func (f *fsMergeServicePerformer) mergeMany(p metadata.MergePlan) error {
 		strings.Join(f.table.OrderBy, ","),
 		tmpFilePath,
 	)
-	_, err = conn.Exec(createTableSQL)
+	_, err = conn.ExecContext(context.Background(), createTableSQL)
 
 	if err != nil {
 		fmt.Println(createTableSQL)

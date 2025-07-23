@@ -4,6 +4,15 @@ import pyarrow as pa
 import sqlglot
 import json
 import re
+from icecream import ic
+
+class CustomDuckDBDialect(sqlglot.dialects.DuckDB):
+    class Parser(sqlglot.dialects.DuckDB.Parser):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            for f in ["EPOCH", "EPOCH_MS", "ARRAY"]:
+                if f in self.FUNCTIONS:
+                    del self.FUNCTIONS[f]
 
 def tables(query) -> str:
     try:
@@ -22,12 +31,12 @@ def tables(query) -> str:
 def inject(query, metadata_json):
     try:
         metadata = [(f['path'], { "__timestamp": RangeFieldInfo(
-                min_value=pa.scalar(f['min']),
-                max_value=pa.scalar(f['max']),
+                min_value=pa.scalar(f['min'], pa.int64()),
+                max_value=pa.scalar(f['max'], pa.int64()),
                 has_nulls=False,
                 has_non_nulls=True
         )}) for f in json.loads(metadata_json)]
-        res = sqlglot.parse_one(query, dialect="duckdb")
+        res = sqlglot.parse_one(query, dialect=CustomDuckDBDialect)
         frm = None
         whr = None
         for node in res.walk():

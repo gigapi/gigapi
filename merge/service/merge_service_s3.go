@@ -2,12 +2,12 @@ package service
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"github.com/gigapi/gigapi-config/config"
 	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/gigapi/gigapi/v2/merge/utils"
 	"github.com/gigapi/metadata"
+	"github.com/jmoiron/sqlx"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"net/url"
@@ -119,7 +119,7 @@ func (s *s3MergeServicePerformer) getPaths(files []string) []string {
 	return res
 }
 
-func (s *s3MergeServicePerformer) createSecret(conn *sql.DB) (func(), error) {
+func (s *s3MergeServicePerformer) createSecret(conn *sqlx.Conn) (func(), error) {
 	sanitizedLName := s.desc.layer.Name
 	sanitizedLName = regexp.MustCompile("[^a-zA-Z0-9_]").ReplaceAllString(sanitizedLName, "_")
 	secretName := fmt.Sprintf("secret_%s", sanitizedLName)
@@ -132,15 +132,15 @@ func (s *s3MergeServicePerformer) createSecret(conn *sql.DB) (func(), error) {
 	SCOPE 's3://%s',
     URL_STYLE '%s'
 );`, secretName, s.desc.secure, s.desc.apiKey, s.desc.apiSecret, s.desc.hostname, s.desc.bucket, s.desc.urlStyle)
-	_, err := conn.Exec(req)
+	_, err := conn.ExecContext(context.Background(), req)
 	if err != nil {
 		return nil, err
 	}
-	return func() { conn.Exec("DROP SECRET IF EXISTS %s;", secretName) }, nil
+	return func() { conn.ExecContext(context.Background(), "DROP SECRET IF EXISTS %s;", secretName) }, nil
 }
 
 func (s *s3MergeServicePerformer) mergeFirstIteration(p metadata.MergePlan) error {
-	conn, cancel, err := utils.ConnectDuckDB("?access_mode=READ_WRITE&allow_unsigned_extensions=1")
+	conn, cancel, err := utils.ConnectDuckDB("")
 	if err != nil {
 		return err
 	}
@@ -157,7 +157,7 @@ func (s *s3MergeServicePerformer) mergeFirstIteration(p metadata.MergePlan) erro
 		strings.Join(s.getPaths(p.From), "','"),
 		strings.Join(s.table.OrderBy, " ASC,")+" ASC",
 		s.getPaths([]string{p.To})[0])
-	_, err = conn.Exec(req)
+	_, err = conn.ExecContext(context.Background(), req)
 	if err != nil {
 		fmt.Println(req)
 		fmt.Println("Error read_parquet_mergetree: ", err)
@@ -166,7 +166,7 @@ func (s *s3MergeServicePerformer) mergeFirstIteration(p metadata.MergePlan) erro
 }
 
 func (s *s3MergeServicePerformer) mergeMany(p metadata.MergePlan) error {
-	conn, cancel, err := utils.ConnectDuckDB("?access_mode=READ_WRITE&allow_unsigned_extensions=1")
+	conn, cancel, err := utils.ConnectDuckDB("")
 	if err != nil {
 		return err
 	}
@@ -188,7 +188,7 @@ func (s *s3MergeServicePerformer) mergeMany(p metadata.MergePlan) error {
 		strings.Join(s.getPaths(p.From), "','"),
 		strings.Join(s.table.OrderBy, ","),
 		s.getPaths([]string{p.To})[0])
-	_, err = conn.Exec(createTableSQL)
+	_, err = conn.ExecContext(context.Background(), createTableSQL)
 
 	if err != nil {
 		fmt.Println(createTableSQL)

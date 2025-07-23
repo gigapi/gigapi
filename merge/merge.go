@@ -1,6 +1,7 @@
 package merge
 
 import (
+	"context"
 	"github.com/gigapi/gigapi-config/config"
 	"github.com/gigapi/gigapi/v2/merge/handlers"
 	"github.com/gigapi/gigapi/v2/merge/reader"
@@ -25,13 +26,13 @@ func Init(api modules.Api) {
 	if err != nil {
 		panic(err)
 	}
-	conn, cancel, err := utils.ConnectDuckDB("?access_mode=READ_WRITE&allow_unsigned_extensions=1")
+	conn, cancel, err := utils.ConnectDuckDB("")
 	if err != nil {
 		panic(err)
 	}
 	defer cancel()
 
-	_, err = conn.Exec("INSTALL json; LOAD json;")
+	_, err = conn.ExecContext(context.Background(), "INSTALL json; LOAD json;")
 	if err != nil {
 		panic(err)
 	}
