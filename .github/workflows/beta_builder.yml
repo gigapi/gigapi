@@ -1,6 +1,9 @@
 name: Beta Container Builder
 
 on:
+  push:
+    branches:
+      - feat/smart-querier
   workflow_dispatch:
     inputs:
       branch:
