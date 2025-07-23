@@ -49,10 +49,15 @@ jobs:
       uses: docker/metadata-action@v5.5.1
       with:
         images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=raw,value=${{ inputs.tag || 'beta' }}
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v5.3.0
       with:
         context: .
+        platforms: linux/amd64
         push: true
-        tags: ${{ env.DOCKER_REPO }}:${{ inputs.tag || 'smart-querier' }} 
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+
