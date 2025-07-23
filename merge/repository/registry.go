@@ -20,7 +20,7 @@ import (
 var conn *sql.DB
 
 var registry = make(map[[2]string]service.MergeService)
-var dbIndex metadata.DBIndex
+var DBIndex metadata.DBIndex
 var mergeTicker *time.Ticker
 var registryMtx sync.Mutex
 var KV metadata.KVStoreIndex
@@ -37,10 +37,10 @@ func InitRegistry() error {
 	}
 	switch config.Config.Gigapi.Metadata.Type {
 	case "json":
-		dbIndex = metadata.NewJSONDBIndex(layers)
+		DBIndex = metadata.NewJSONDBIndex(layers)
 	case "redis":
 		var err error
-		dbIndex, err = metadata.NewRedisDbIndex(config.Config.Gigapi.Metadata.URL)
+		DBIndex, err = metadata.NewRedisDbIndex(config.Config.Gigapi.Metadata.URL)
 		if err != nil {
 			return err
 		}
@@ -70,14 +70,14 @@ var DBNotFoundError error = fmt.Errorf("database not found")
 var TableNotFoundError error = fmt.Errorf("table not found")
 
 func GetTableIndex(db string, name string) (metadata.TableIndex, error) {
-	dbs, err := dbIndex.Databases()
+	dbs, err := DBIndex.Databases()
 	if err != nil {
 		return nil, err
 	}
 	if !slices.Contains(dbs, db) {
 		return nil, DBNotFoundError
 	}
-	tables, err := dbIndex.Tables(db)
+	tables, err := DBIndex.Tables(db)
 	if err != nil {
 		return nil, err
 	}

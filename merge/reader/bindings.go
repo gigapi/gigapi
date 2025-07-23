@@ -2,12 +2,14 @@ package reader
 
 import "C"
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gigapi/gigapi-config/config"
 	"github.com/gigapi/metadata"
 	"github.com/tliron/py4go"
 	path2 "path"
+	"runtime"
 	"slices"
 	"sync"
 )
@@ -29,6 +31,12 @@ type py struct {
 	inject *python.Reference
 	tables *python.Reference
 	cancel []func()
+	m      sync.Mutex
+	tasks  []func()
+	next   context.Context
+	doNext func()
+	ctx    context.Context
+	stop   func()
 }
 
 func noErr(f func() error) func() {
@@ -44,7 +52,6 @@ func (p *py) defr(f func()) {
 func (p *py) Init() {
 	python.Initialize()
 	p.defr(noErr(python.Finalize))
-	python.SetPythonPath("/src")
 	sys, _ := python.Import("sys")
 	p.defr(sys.Release)
 
@@ -61,11 +68,37 @@ func (p *py) Init() {
 	foo, _ := python.Import("merge.reader")
 	p.defr(foo.Release)
 
-	inject, _ := foo.GetAttr("inject")
-	p.defr(inject.Release)
+	p.inject, _ = foo.GetAttr("inject")
+	p.defr(p.inject.Release)
 
-	tables, _ := foo.GetAttr("tables")
-	p.defr(tables.Release)
+	p.tables, _ = foo.GetAttr("tables")
+	p.defr(p.tables.Release)
+
+	p.next, p.doNext = context.WithCancel(context.Background())
+	p.ctx, p.stop = context.WithCancel(context.Background())
+	go p.Run()
+}
+
+func (p *py) Run() {
+	runtime.LockOSThread()
+	for true {
+		select {
+		case <-p.next.Done():
+			p.m.Lock()
+			_tasks := p.tasks
+			p.tasks = nil
+			p.next, p.doNext = context.WithCancel(context.Background())
+			p.m.Unlock()
+			for _, t := range _tasks {
+				t()
+			}
+		case <-p.ctx.Done():
+			break
+		}
+	}
+	for _, c := range p.cancel {
+		c()
+	}
 }
 
 type bindMeta struct {
@@ -90,7 +123,62 @@ func (p *py) computePath(m *metadata.IndexEntry) (string, error) {
 	return "", fmt.Errorf("unsupported layer type: %q", config.Config.Gigapi.Layers[idx].Type)
 }
 
+type resS[T any] struct {
+	res T
+	err error
+}
+
+type bndResponse[T any] struct {
+	Status string `json:"status"`
+	Error  string `json:"error,omitempty"`
+	Result T      `json:"result,omitempty"`
+}
+
+func bindResponse[T any](res string) (T, error) {
+	var r bndResponse[T]
+	err := json.Unmarshal([]byte(res), &r)
+	var val T
+	if err != nil {
+		return val, fmt.Errorf("failed to parse JSON: %w", err)
+	}
+	if r.Error != "" {
+		return val, fmt.Errorf(r.Error)
+	}
+	return r.Result, nil
+}
+
 func (p *py) Inject(query string, metadata []*metadata.IndexEntry) (string, error) {
+	c := make(chan resS[string])
+	defer close(c)
+	p.m.Lock()
+	p.tasks = append(p.tasks, func() {
+		_res, err := p._inject(query, metadata)
+		c <- resS[string]{_res, err}
+	})
+	p.doNext()
+	p.m.Unlock()
+	_res := <-c
+	return bindResponse[string](_res.res)
+}
+
+func (p *py) Tables(query string) ([]string, error) {
+	c := make(chan resS[string])
+	defer close(c)
+	p.m.Lock()
+	p.tasks = append(p.tasks, func() {
+		_res, err := p._tables(query)
+		c <- resS[string]{_res, err}
+	})
+	p.doNext()
+	p.m.Unlock()
+	_res := <-c
+	return bindResponse[[]string](_res.res)
+}
+
+func (p *py) _inject(query string, metadata []*metadata.IndexEntry) (string, error) {
+	p.m.Lock()
+	defer p.m.Unlock()
+
 	binds := make([]bindMeta, len(metadata))
 	for i, m := range metadata {
 		pth, err := p.computePath(m)
@@ -107,25 +195,31 @@ func (p *py) Inject(query string, metadata []*metadata.IndexEntry) (string, erro
 	if err != nil {
 		return "", err
 	}
-	res, err := p.inject.Call("inject", query, string(strMeta))
+	state := python.EnsureGilState()
+	defer state.Release()
+	res, err := p.inject.Call(query, string(strMeta))
 	if err != nil {
 		return "", err
 	}
 	defer res.Release()
-	return res.String(), nil
+	str := res.String()
+	return str, nil
 }
 
-func (p *py) Tables(query string) ([]string, error) {
+func (p *py) _tables(query string) (string, error) {
+	p.m.Lock()
+	defer p.m.Unlock()
+	state := python.EnsureGilState()
+	defer state.Release()
 	res, err := p.tables.Call(query)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer res.Release()
 
-	var tables []string
-	err = json.Unmarshal([]byte(res.String()), &tables)
-	if err != nil {
-		return nil, err
-	}
-	return tables, nil
+	return res.String(), nil
+}
+
+func (p *py) Destroy() {
+	p.stop()
 }

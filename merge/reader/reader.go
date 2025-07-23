@@ -9,13 +9,26 @@ import (
 	"github.com/jmoiron/sqlx"
 	"io/ioutil"
 	"net/http"
+	"regexp"
+	"slices"
+	"strconv"
 	"strings"
+	"time"
 )
 
 func addCORSHeaders(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+}
+
+type QueryRequest struct {
+	Query string `json:"query"`
+	DB    string `json:"db,omitempty"`
+}
+
+type QueryResponse struct {
+	Results []map[string]interface{} `json:"results"`
 }
 
 func Query(w http.ResponseWriter, r *http.Request) error {
@@ -26,22 +39,25 @@ func Query(w http.ResponseWriter, r *http.Request) error {
 		return nil
 	}
 
-	query, err := ioutil.ReadAll(r.Body)
+	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return err
 	}
 	defer r.Body.Close()
 
-	db := r.URL.Query().Get("db")
-	if db == "" {
-		db = "default"
-	}
-
-	queryWithRightFrom, err := injectParquet(string(query), db)
+	var query QueryRequest
+	err = json.Unmarshal(body, &query)
 	if err != nil {
 		return err
 	}
-	fmt.Println("QUERY: " + queryWithRightFrom)
+
+	db := r.URL.Query().Get("db")
+	if db == "" {
+		db = query.DB
+	}
+	if db == "" {
+		db = "default"
+	}
 
 	conn, cancel, err := utils.ConnectDuckDB("?access_mode=READ_WRITE&allow_unsigned_extensions=1")
 	if err != nil {
@@ -50,16 +66,23 @@ func Query(w http.ResponseWriter, r *http.Request) error {
 	defer cancel()
 
 	connx := sqlx.NewDb(conn, "duckdb")
-
-	rows, err := connx.Queryx(queryWithRightFrom)
-	if err != nil {
-		return err
-	}
-
-	var _rows []map[string]any
-	for rows.Next() {
-		row := make(map[string]any)
-		err = rows.MapScan(row)
+	var rows []map[string]any
+	if strings.ToLower(query.Query) == "show databases" {
+		rows, err = doShowDatabases(connx)
+		if err != nil {
+			return err
+		}
+	} else if strings.HasPrefix(strings.ToLower(query.Query), "show tables") {
+		rows, err = doShowTables(connx, query.Query, db)
+		if err != nil {
+			return err
+		}
+	} else {
+		queryWithRightFrom, err := injectParquet(query.Query, db)
+		if err != nil {
+			return err
+		}
+		rows, err = doQuery(connx, queryWithRightFrom)
 		if err != nil {
 			return err
 		}
@@ -69,22 +92,56 @@ func Query(w http.ResponseWriter, r *http.Request) error {
 	case "ndjson":
 		w.Header().Set("Content-Type", "application/x-ndjson; charset=utf-8")
 		enc := json.NewEncoder(w)
-		for _, row := range _rows {
+		for _, row := range rows {
 			enc.Encode(row)
 			w.Write([]byte("\n"))
 		}
+		return nil
 	case "json":
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		json.NewEncoder(w).Encode(_rows)
+		json.NewEncoder(w).Encode(QueryResponse{Results: ProcessResultsForJSON(rows)})
+		return nil
 	}
 	return fmt.Errorf("unsupported format: %s", r.URL.Query().Get("format"))
 }
 
+func ProcessResultsForJSON(results []map[string]interface{}) []map[string]interface{} {
+	processedResults := make([]map[string]interface{}, len(results))
+
+	for i, row := range results {
+		processedRow := make(map[string]interface{})
+
+		for key, value := range row {
+			// Handle different types of values
+			switch v := value.(type) {
+			case nil:
+				processedRow[key] = nil
+			case int64:
+				// Convert int64 to string for JSON
+				processedRow[key] = strconv.FormatInt(v, 10)
+			case time.Time:
+				// Format time values
+				processedRow[key] = v.Format(time.RFC3339Nano)
+			default:
+				processedRow[key] = v
+			}
+		}
+
+		processedResults[i] = processedRow
+	}
+
+	return processedResults
+}
+
 func injectParquet(query string, db string) (string, error) {
 	py := getPy()
-	tables, err := py.Tables(string(query))
+	tables, err := py.Tables(query)
 	if err != nil {
 		return "", err
+	}
+
+	if len(tables) < 1 {
+		return query, nil
 	}
 
 	table := tables[0]
@@ -110,4 +167,92 @@ func injectParquet(query string, db string) (string, error) {
 		return "", err
 	}
 	return queryWithRightFrom, nil
+}
+
+func doShowDatabases(conn *sqlx.DB) ([]map[string]any, error) {
+	entries, err := repository2.DBIndex.Databases()
+	if err != nil {
+		return nil, err
+	}
+	var results []map[string]any
+	for _, entry := range entries {
+		results = append(results, map[string]interface{}{
+			"database_name": entry,
+		})
+	}
+	rows, err := conn.Queryx("SHOW DATABASES")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		row := make(map[string]any)
+		rows.MapScan(row)
+		results = append(results, row)
+	}
+	return results, nil
+}
+
+func doQuery(connx *sqlx.DB, queryWithRightFrom string) ([]map[string]any, error) {
+	var res []map[string]any
+	rows, err := connx.Queryx(queryWithRightFrom)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		row := make(map[string]any)
+		err = rows.MapScan(row)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, row)
+	}
+	return res, nil
+}
+
+var showTablesRe = regexp.MustCompile(`SHOW\s+TABLES(\s+FROM\s+([a-zA-Z_][a-zA-Z0-9_]*))?`)
+
+func doShowTables(connx *sqlx.DB, query string, db string) ([]map[string]any, error) {
+	// Match the query against the regular expression
+	matches := showTablesRe.FindStringSubmatch(query)
+
+	// If no matches found or not enough matches, return an error
+
+	if matches[2] != "" {
+		db = matches[2]
+	}
+
+	dbs, err := repository2.DBIndex.Databases()
+	if err != nil {
+		return nil, err
+	}
+	var res []map[string]any
+	if slices.Contains(dbs, db) {
+		tables, err := repository2.DBIndex.Tables(db)
+		if err != nil {
+			return nil, err
+		}
+		for _, t := range tables {
+			res = append(res, map[string]any{"table_name": t})
+		}
+		return res, nil
+	}
+
+	rows, err := connx.Queryx(query)
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		row := make(map[string]any)
+		err = rows.MapScan(row)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, row)
+	}
+
+	return res, nil
 }
