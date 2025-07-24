@@ -111,7 +111,7 @@ func InitHandlers(api modules.Api) {
 	})
 	api.RegisterRoute(&modules.Route{
 		Path:    "/query",
-		Methods: []string{"POST"},
+		Methods: []string{"POST", "OPTIONS"},
 		Handler: reader.Query,
 	})
 }
