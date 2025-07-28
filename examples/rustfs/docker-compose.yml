@@ -1,0 +1,43 @@
+services:
+  gigapi:
+    image: ghcr.io/gigapi/gigapi:latest
+    container_name: gigapi
+    hostname: gigapi
+    restart: unless-stopped
+    volumes:
+      - ./data:/data
+    ports:
+      - "7971:7971"
+      - "8082:8082"
+    environment:
+      - PORT=7971
+      - GIGAPI_ENABLED=true
+      - GIGAPI_MERGE_TIMEOUT_S=10
+      - GIGAPI_ROOT=/data
+      - GIGAPI_LAYERS_0_NAME=default
+      - GIGAPI_LAYERS_0_TYPE=fs
+      - GIGAPI_LAYERS_0_URL=file:///data
+      - GIGAPI_LAYERS_0_GLOBAL=false
+      - GIGAPI_LAYERS_0_TTL=12h
+      - GIGAPI_LAYERS_1_NAME=s3
+      - GIGAPI_LAYERS_1_TYPE=s3
+      - GIGAPI_LAYERS_1_URL=s3://rustfs/data
+      - GIGAPI_LAYERS_1_AUTH_KEY=admin
+      - GIGAPI_LAYERS_1_AUTH_SECRET=gigapw
+      - GIGAPI_LAYERS_1_GLOBAL=true
+      - GIGAPI_LAYERS_1_TTL=0
+  rustfs:
+    image: rustfs/rustfs:latest
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./fs:/data
+    command: server /data
+    environment:
+      - RUSTFS_ROOT_USER=admin
+      - RUSTFS_ROOT_PASSWORD=gigapw
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/rustfs/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
