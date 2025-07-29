@@ -9,6 +9,8 @@ from views import reader, writer, middlewares, ui
 from services.merge import run
 import asyncio
 from config import settings
+from threading import Thread
+from airport import writer_server
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,8 +31,14 @@ async def start_background_tasks():
     # Start the run function as a background task
     asyncio.create_task(run())
 
+def run_airport_server():
+    print("START")
+    writer_server.run()
+    print("END")
 
 def main():
+    t = Thread(target=run_airport_server)
+    t.start()
     loop = asyncio.get_event_loop()
     config = uvicorn.Config("__main__:app", host=settings.http.host, port=settings.http.port, loop=loop, reload=True)
     server = uvicorn.Server(config)

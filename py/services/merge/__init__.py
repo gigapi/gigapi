@@ -14,13 +14,6 @@ merge_service = None
 async def run():
     global merge_service
     if settings.gigapi.metadata.type == "ducklake":
-        print("STARTING MERGE")
-        merge_service = DucklakeMergeService()
+        print("NO MERGE")
         while True:
-            print("MERGE")
-            try:
-                await merge_service.do_merge()
-            except Exception as e:
-                logger.error(e, exc_info=True)
-            finally:
-                await asyncio.sleep(10)
+            await asyncio.sleep(10)

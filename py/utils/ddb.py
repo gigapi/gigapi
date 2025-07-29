@@ -8,6 +8,7 @@ from config import settings
 from fsspec.implementations import memory
 import asyncio
 import functools
+from icecream import ic
 
 memfs = memory.MemoryFileSystem()
 
@@ -33,21 +34,22 @@ def connect_duckdb(conn_str: str = None) -> DuckDBPyConnection:
     conn.register_filesystem(memfs)
     return conn
 
-def connect_ducklake(conn_str: str = None) -> Tuple[AsyncDuckDBConnection, Callable[[], None]]:
+def connect_airport(conn_str: str = None) -> Tuple[AsyncDuckDBConnection, Callable[[], None]]:
 
     try:
         conn = connect_duckdb(conn_str)
 
         if settings.gigapi.metadata.type == "ducklake":
             # Install the ducklake extension
-            conn.execute("INSTALL ducklake;")
-            conn.execute("LOAD ducklake;")
+            conn.execute("INSTALL airport FROM community;")
+            conn.execute("LOAD airport")
 
-            # Attach to the 'my_ducklake' database
-            ducklake_url = settings.gigapi.metadata.url
-            q = f"ATTACH 'ducklake:{ducklake_url}' AS my_ducklake (DATA_PATH '{settings.gigapi.root}');"
-            conn.execute(q)
-            conn.execute("USE my_ducklake;")
+            conn.execute("""
+CREATE SECRET airport_testing (type airport, auth_token 'example_token', scope 'grpc://localhost:6001/');
+""")
+            # conn.execute("CALL airport_action('grpc://localhost:6001/', 'create_database', 'my_airport');")
+            # conn.execute("ATTACH 'my_airport' (TYPE  AIRPORT, location 'grpc://localhost:6001/')")
+            # conn.execute("CREATE SCHEMA my_airport.factory1")
 
         if get_duckdb_mem_limit():
             conn.execute(f"SET memory_limit='{get_duckdb_mem_limit()}'")
@@ -68,7 +70,7 @@ def connect_ducklake(conn_str: str = None) -> Tuple[AsyncDuckDBConnection, Calla
 @asynccontextmanager
 async def async_ducklake_connection(conn_str: str = None):
     loop = asyncio.get_running_loop()
-    async_conn, cancel = await loop.run_in_executor(None, functools.partial(connect_ducklake, conn_str))
+    async_conn, cancel = await loop.run_in_executor(None, functools.partial(connect_airport, conn_str))
     try:
         yield async_conn
     finally:

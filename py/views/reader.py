@@ -29,7 +29,7 @@ async def query_data(database: Optional[str] = Query(None, description="database
     if not database:
         database = query_request.db
     if not database:
-        database = "my_ducklake"
+        database = ""
 
     if format == "json":
         data = [row async for row in query(query_request.query, database)]
