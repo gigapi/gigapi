@@ -427,9 +427,9 @@ func (h *HiveMergeTreeService) Merge(plan map[string][]metadata.MergePlan) error
 	start := time.Now()
 	eg := &errgroup.Group{}
 	for layer, plans := range plan {
+		_layer := layer
+		_plans := plans
 		eg.Go(func() error {
-			_layer := layer
-			_plans := plans
 			err := h.mergeService[_layer].DoMerge(_plans)
 			return err
 		})

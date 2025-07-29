@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/gigapi/metadata"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"html/template"
 	"os"
@@ -153,15 +154,14 @@ func (f *mergeServiceManager) updateIndex(merge metadata.MergePlan) error {
 }
 
 func (f *mergeServiceManager) doMerge(merges []metadata.MergePlan, merge func(p metadata.MergePlan) error) error {
+	errGroup := errgroup.Group{}
 	for _, m := range merges {
 		_m := m
-		err := merge(_m)
-		if err != nil {
-			//errGroup.Cancel(err)
-			return err
-		}
+		errGroup.Go(func() error {
+			return f.merge(_m)
+		})
 	}
-	return nil
+	return errGroup.Wait()
 }
 
 func (f *mergeServiceManager) DoMerge(merges []metadata.MergePlan) error {

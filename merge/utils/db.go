@@ -26,6 +26,10 @@ func getDb(path string) (*sqlx.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	_, err = db.Exec("INSTALL parquet; LOAD parquet;")
+	if err != nil {
+		return nil, err
+	}
 	_, err = db.Exec("SET memory_limit='" + getDuckDBMemLimit() + "'")
 	if err != nil {
 		return nil, err
