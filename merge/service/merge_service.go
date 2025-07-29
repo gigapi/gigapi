@@ -69,7 +69,9 @@ func (f *mergeServiceManager) merge(p metadata.MergePlan) error {
 	if p.Iteration == 1 {
 		err = f.mergeServicePerformer.mergeFirstIteration(p)
 	} else if len(p.From) == 1 {
-		err = f.mergeServicePerformer.mergeOne(p)
+		fmt.Printf("Only one file. Skipping merge.")
+		return nil
+		//err = f.mergeServicePerformer.mergeOne(p)
 	} else {
 		err = f.mergeServicePerformer.mergeMany(p)
 	}
