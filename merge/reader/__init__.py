@@ -4,6 +4,7 @@ import pyarrow as pa
 import sqlglot
 import json
 import re
+import struct
 from icecream import ic
 
 class CustomDuckDBDialect(sqlglot.dialects.DuckDB):
@@ -28,6 +29,35 @@ def tables(query) -> str:
         traceback.print_exc()
         return json.dumps({"status": "error", "message": str(e)})
 
+def decode_binds(encoded_binds):
+    result = []
+    offset = 0
+    while offset < len(encoded_binds):
+        # Read path length (2 bytes, little-endian)
+        path_length = struct.unpack_from('<H', encoded_binds, offset)[0]
+        offset += 2
+
+        # Read path
+        path = encoded_binds[offset:offset+path_length].decode('utf-8')
+        offset += path_length
+
+        # Read MinTime (8 bytes, little-endian)
+        min_time = struct.unpack_from('<q', encoded_binds, offset)[0]
+        offset += 8
+
+        # Read MaxTime (8 bytes, little-endian)
+        max_time = struct.unpack_from('<q', encoded_binds, offset)[0]
+        offset += 8
+
+        result.append({
+            'path': path,
+            'min': min_time,
+            'max': max_time
+        })
+
+    return result
+
+
 def inject(query, metadata_json):
     try:
         metadata = [(f['path'], { "__timestamp": RangeFieldInfo(
@@ -35,7 +65,7 @@ def inject(query, metadata_json):
                 max_value=pa.scalar(f['max'], pa.int64()),
                 has_nulls=False,
                 has_non_nulls=True
-        )}) for f in json.loads(metadata_json)]
+        )}) for f in decode_binds(metadata_json)]
         res = sqlglot.parse_one(query)
         frm = None
         whr = None
