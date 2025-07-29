@@ -140,6 +140,9 @@ func (s *s3MergeServicePerformer) createSecret(conn *sqlx.Conn) (func(), error) 
 }
 
 func (s *s3MergeServicePerformer) mergeFirstIteration(p metadata.MergePlan) error {
+	getFirstIterationSemaphore().Acquire(context.Background(), 1)
+	defer getFirstIterationSemaphore().Release(1)
+
 	conn, cancel, err := utils.ConnectDuckDB("")
 	if err != nil {
 		return err

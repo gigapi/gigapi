@@ -146,8 +146,8 @@ func (f *fsMergeServicePerformer) getAbsPaths(relPaths []string) []string {
 }
 
 func (f *fsMergeServicePerformer) mergeFirstIteration(p metadata.MergePlan) error {
-	firstIterationSemaphore.Acquire(context.Background(), 1)
-	defer firstIterationSemaphore.Release(1)
+	getFirstIterationSemaphore().Acquire(context.Background(), 1)
+	defer getFirstIterationSemaphore().Release(1)
 
 	tmpFilePath := filepath.Join(f.tmpPath, filepath.Base(p.To))
 	finalFilePath := filepath.Join(f.dataPath, p.To)

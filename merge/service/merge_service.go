@@ -6,6 +6,9 @@ import (
 	"github.com/gigapi/metadata"
 	"golang.org/x/sync/semaphore"
 	"html/template"
+	"os"
+	"strconv"
+	"sync"
 	"time"
 )
 
@@ -42,7 +45,23 @@ var tmpl = func() *template.Template {
 }()
 
 // TODO: ADD configuration for this
-var firstIterationSemaphore = semaphore.NewWeighted(1)
+var _firstIterationSemaphore *semaphore.Weighted
+var once sync.Mutex
+
+func getFirstIterationSemaphore() *semaphore.Weighted {
+	once.Lock()
+	defer once.Unlock()
+	if _firstIterationSemaphore == nil {
+		//TODO: FIX
+		symLimit := os.Getenv("GIGAPI_FIRST_ITERATION_SIMULTANEOUS_LIMIT")
+		maxFirstMerge := 1
+		if symLimit != "" {
+			maxFirstMerge, _ = strconv.Atoi(symLimit)
+		}
+		_firstIterationSemaphore = semaphore.NewWeighted(int64(maxFirstMerge))
+	}
+	return _firstIterationSemaphore
+}
 
 func (f *mergeServiceManager) merge(p metadata.MergePlan) error {
 	var err error
@@ -126,7 +145,7 @@ func (f *mergeServiceManager) updateIndex(merge metadata.MergePlan) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Finishing merge: %v\n", merge)
+	fmt.Printf("Finishing merge: %d files to %s\n", len(merge.From), merge.To)
 	_, err = f.index.GetMergePlanner().EndMerge(merge).Get()
 	return err
 }
