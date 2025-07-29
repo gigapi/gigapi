@@ -1,0 +1,21 @@
+apiVersion: 1
+
+datasources:
+  - name: FlightSQL
+    type: influxdata-flightsql-datasource
+    typeName: FlightSQL
+    access: proxy
+    url: ''
+    user: ''
+    database: ''
+    basicAuth: false
+    isDefault: true
+    jsonData:
+      host: gigapi:8082
+      metadata:
+      - bucket-name: telegraf
+      - database: telegraf
+      secure: false
+      token: ${INFLUX_TOKEN}
+    readOnly: false
+    editable: true
