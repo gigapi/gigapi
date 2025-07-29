@@ -64,6 +64,7 @@ func getFirstIterationSemaphore() *semaphore.Weighted {
 }
 
 func (f *mergeServiceManager) merge(p metadata.MergePlan) error {
+	fmt.Printf("Starting merge [%s] %d files - %s\n", p.Table, len(p.From), p.To)
 	var err error
 	if p.Iteration == 1 {
 		err = f.mergeServicePerformer.mergeFirstIteration(p)
@@ -76,14 +77,14 @@ func (f *mergeServiceManager) merge(p metadata.MergePlan) error {
 	if err != nil {
 		return err
 	}
-
+	fmt.Printf("   Merge: updating index")
 	if f.index != nil {
 		err = f.updateIndex(p)
 		if err != nil {
 			return err
 		}
 	}
-
+	fmt.Printf("Finishing merge: [%s] %d files to %s\n", p.Table, len(p.From), p.To)
 	return nil
 
 	/*
@@ -145,7 +146,6 @@ func (f *mergeServiceManager) updateIndex(merge metadata.MergePlan) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Finishing merge: %d files to %s\n", len(merge.From), merge.To)
 	_, err = f.index.GetMergePlanner().EndMerge(merge).Get()
 	return err
 }
