@@ -78,10 +78,13 @@ func Query(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 	} else {
+		fmt.Printf("Injecting parquet files...\n")
+		start := time.Now()
 		queryWithRightFrom, err := injectParquet(query.Query, db)
 		if err != nil {
 			return err
 		}
+		fmt.Printf("Injecting parquet took: %v\n", time.Since(start))
 		rows, err = doQuery(connx, queryWithRightFrom)
 		if err != nil {
 			return err
@@ -195,6 +198,11 @@ func doShowDatabases(conn *sqlx.Conn) ([]map[string]any, error) {
 
 func doQuery(connx *sqlx.Conn, queryWithRightFrom string) ([]map[string]any, error) {
 	var res []map[string]any
+	fmt.Printf("Executing query: \"%s\"\n", queryWithRightFrom)
+	start := time.Now()
+	defer func() {
+		fmt.Printf("Query took: %v\n", time.Since(start))
+	}()
 	rows, err := connx.QueryxContext(context.Background(), queryWithRightFrom)
 	if err != nil {
 		return nil, err
