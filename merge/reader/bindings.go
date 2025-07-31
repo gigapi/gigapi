@@ -3,6 +3,7 @@ package reader
 import "C"
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"github.com/gigapi/gigapi-config/config"
@@ -175,6 +176,43 @@ func (p *py) Tables(query string) ([]string, error) {
 	return bindResponse[[]string](_res.res)
 }
 
+func customMarshalBinds(binds []bindMeta) ([]byte, error) {
+	var result []byte
+
+	for _, bind := range binds {
+		// Convert path to bytes
+		pathBytes := []byte(bind.Path)
+
+		// Path length (int16 little endian)
+		pathLenBytes := make([]byte, 2)
+		binary.LittleEndian.PutUint16(pathLenBytes, uint16(len(pathBytes)))
+		result = append(result, pathLenBytes...)
+
+		// Path string
+		result = append(result, pathBytes...)
+
+		// MinTime (int64 little endian)
+		minTimeBytes := make([]byte, 8)
+		minTime, ok := bind.Min.(int64)
+		if !ok {
+			return nil, fmt.Errorf("MinTime is not int64")
+		}
+		binary.LittleEndian.PutUint64(minTimeBytes, uint64(minTime))
+		result = append(result, minTimeBytes...)
+
+		// MaxTime (int64 little endian)
+		maxTimeBytes := make([]byte, 8)
+		maxTime, ok := bind.Max.(int64)
+		if !ok {
+			return nil, fmt.Errorf("MaxTime is not int64")
+		}
+		binary.LittleEndian.PutUint64(maxTimeBytes, uint64(maxTime))
+		result = append(result, maxTimeBytes...)
+	}
+
+	return result, nil
+}
+
 func (p *py) _inject(query string, metadata []*metadata.IndexEntry) (string, error) {
 	p.m.Lock()
 	defer p.m.Unlock()
@@ -191,13 +229,13 @@ func (p *py) _inject(query string, metadata []*metadata.IndexEntry) (string, err
 			Max:  m.MaxTime,
 		}
 	}
-	strMeta, err := json.Marshal(binds)
+	strMeta, err := customMarshalBinds(binds) // json.Marshal(binds)
 	if err != nil {
 		return "", err
 	}
 	state := python.EnsureGilState()
 	defer state.Release()
-	res, err := p.inject.Call(query, string(strMeta))
+	res, err := p.inject.Call(query, strMeta)
 	if err != nil {
 		return "", err
 	}

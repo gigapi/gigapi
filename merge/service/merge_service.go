@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gigapi/gigapi/v2/merge/shared"
 	"github.com/gigapi/metadata"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"html/template"
 	"os"
@@ -64,11 +65,14 @@ func getFirstIterationSemaphore() *semaphore.Weighted {
 }
 
 func (f *mergeServiceManager) merge(p metadata.MergePlan) error {
+	fmt.Printf("Starting merge [%s] %d files - %s\n", p.Table, len(p.From), p.To)
 	var err error
 	if p.Iteration == 1 {
 		err = f.mergeServicePerformer.mergeFirstIteration(p)
 	} else if len(p.From) == 1 {
-		err = f.mergeServicePerformer.mergeOne(p)
+		fmt.Printf("Only one file. Skipping merge.")
+		return nil
+		//err = f.mergeServicePerformer.mergeOne(p)
 	} else {
 		err = f.mergeServicePerformer.mergeMany(p)
 	}
@@ -76,14 +80,14 @@ func (f *mergeServiceManager) merge(p metadata.MergePlan) error {
 	if err != nil {
 		return err
 	}
-
+	fmt.Printf("   Merge: updating index")
 	if f.index != nil {
 		err = f.updateIndex(p)
 		if err != nil {
 			return err
 		}
 	}
-
+	fmt.Printf("Finishing merge: [%s] %d files to %s\n", p.Table, len(p.From), p.To)
 	return nil
 
 	/*
@@ -145,21 +149,19 @@ func (f *mergeServiceManager) updateIndex(merge metadata.MergePlan) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Finishing merge: %d files to %s\n", len(merge.From), merge.To)
 	_, err = f.index.GetMergePlanner().EndMerge(merge).Get()
 	return err
 }
 
 func (f *mergeServiceManager) doMerge(merges []metadata.MergePlan, merge func(p metadata.MergePlan) error) error {
+	errGroup := errgroup.Group{}
 	for _, m := range merges {
 		_m := m
-		err := merge(_m)
-		if err != nil {
-			//errGroup.Cancel(err)
-			return err
-		}
+		errGroup.Go(func() error {
+			return f.merge(_m)
+		})
 	}
-	return nil
+	return errGroup.Wait()
 }
 
 func (f *mergeServiceManager) DoMerge(merges []metadata.MergePlan) error {

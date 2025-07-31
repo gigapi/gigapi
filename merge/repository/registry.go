@@ -45,11 +45,29 @@ func InitRegistry() error {
 			return err
 		}
 	}
+	dbs, err := DBIndex.Databases()
+	if err != nil {
+		fmt.Println("Error initializing metadata index:", err)
+	}
+	for _, db := range dbs {
+		tables, err := DBIndex.Tables(db)
+		if err != nil {
+			fmt.Println("Error initializing metadata tables of database ", db, ":", err)
+		}
+		for _, t := range tables {
+			err = RegisterSimpleTable(db, t)
+			if err != nil {
+				fmt.Println("Error registering table ", db, ".", t, ":", err)
+			} else {
+				fmt.Println("Initialized table ", db, ".", t)
+			}
+		}
+	}
 
 	if !config.Config.Gigapi.NoMerges {
 		go RunMerge()
 	}
-	err := initKVStore()
+	err = initKVStore()
 	return err
 }
 
@@ -102,14 +120,19 @@ func RunMerge() {
 				_registry[k] = v
 			}
 		}()
-
+		wg := sync.WaitGroup{}
 		for _, table := range _registry {
-			err := table.DoMerge()
-			if err != nil {
-				fmt.Println(err)
-				continue
-			}
+			_table := table
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err := _table.DoMerge()
+				if err != nil {
+					fmt.Println(err)
+				}
+			}()
 		}
+		wg.Wait()
 	}
 }
 
