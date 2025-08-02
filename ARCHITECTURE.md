@@ -1850,6 +1850,7 @@ The Query API exposes the following HTTP endpoint:
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/query?db={database}` | POST | Execute a SQL query against the specified database |
+| `/api/v3/query_sql?db={database}` | POST | InfluxDB 3.x compatible query endpoint |
 
 ### Request Format
 
@@ -1860,6 +1861,38 @@ Queries must be sent as JSON in the request body with the following structure:
   "query": "SELECT time, temperature FROM weather WHERE time >= epoch_ns('2025-04-24T00:00:00'::TIMESTAMP)"
 }
 ```
+
+### Format Options
+
+The `format` query parameter controls the response format. Format matching is case-insensitive.
+
+| Format | Description | Content-Type | Example |
+|--------|-------------|--------------|---------|
+| `json` (default) | Wrapped JSON with results array | `application/json` | `{"results": [{"col": "value"}]}` |
+| `ndjson` or `jsonl` | Newline-delimited JSON | `application/x-ndjson` | `{"col": "value"}\n{"col": "value"}` |
+| `csv` | Comma-separated values | `text/csv` | `"col1","col2"\n"value1","value2"` |
+
+**Examples:**
+```bash
+# JSON format (default)
+curl -X POST "http://localhost:7971/query?db=mydb&format=json" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "SELECT * FROM weather LIMIT 1"}'
+
+# NDJSON format
+curl -X POST "http://localhost:7971/query?db=mydb&format=ndjson" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "SELECT * FROM weather LIMIT 1"}'
+
+# JSONL format (alias for ndjson)
+curl -X POST "http://localhost:7971/query?db=mydb&format=jsonl" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "SELECT * FROM weather LIMIT 1"}'
+
+# CSV format
+curl -X POST "http://localhost:7971/query?db=mydb&format=csv" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "SELECT * FROM weather LIMIT 1"}'
 
 ### Response Format
 

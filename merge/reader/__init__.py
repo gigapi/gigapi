@@ -60,30 +60,57 @@ def decode_binds(encoded_binds):
 
 def inject(query, metadata_json):
     try:
-        metadata = [(f['path'], { "__timestamp": RangeFieldInfo(
-                min_value=pa.scalar(f['min'], pa.int64()),
-                max_value=pa.scalar(f['max'], pa.int64()),
-                has_nulls=False,
-                has_non_nulls=True
-        )}) for f in decode_binds(metadata_json)]
+        # OPTIMIZATION: Early return if no metadata
+        if not metadata_json:
+            return json.dumps({"status": "ok", "result": query})
+        
+        # OPTIMIZATION: Process metadata more efficiently
+        metadata = []
+        for f in decode_binds(metadata_json):
+            metadata.append((
+                f['path'], 
+                { "__timestamp": RangeFieldInfo(
+                    min_value=pa.scalar(f['min'], pa.int64()),
+                    max_value=pa.scalar(f['max'], pa.int64()),
+                    has_nulls=False,
+                    has_non_nulls=True
+                )}
+            ))
+        
         res = sqlglot.parse_one(query)
         frm = None
         whr = None
+        
+        # OPTIMIZATION: Single pass through AST
         for node in res.walk():
             if isinstance(node, sqlglot.expressions.From):
                 frm = node
-            if isinstance(node, sqlglot.expressions.Where):
+            elif isinstance(node, sqlglot.expressions.Where):
                 whr = node.this
+                break  # Found WHERE clause, no need to continue
+        
+        # OPTIMIZATION: Early filtering based on WHERE clause
         if whr:
             planner = Planner(metadata)
             matching_files = set(planner.files(whr))
         else:
-            matching_files = set([x[0] for x in metadata])
-        q = "FROM read_parquet(ARRAY[%s])" % ",".join([f"'{f}'" for f in matching_files])
+            # OPTIMIZATION: Use set comprehension for better performance
+            matching_files = {x[0] for x in metadata}
+        
+        # OPTIMIZATION: Early return if no matching files
+        if not matching_files:
+            return json.dumps({"status": "ok", "result": query})
+        
+        # OPTIMIZATION: More efficient string building
+        file_list = ",".join(f"'{f}'" for f in matching_files)
+        q = f"FROM read_parquet(ARRAY[{file_list}])"
+        
         frm2 = sqlglot.parse_one(q)
         for node in frm2.walk():
             if isinstance(node, sqlglot.expressions.From):
                 frm.this.this.replace(node.this.this)
+                break  # Found FROM clause, no need to continue
+        
         _res = re.sub("ARRAY\(([^)]+)\)", "ARRAY[\\1]", str(res))
         return json.dumps({"status": "ok", "result": _res})
     except Exception as e:

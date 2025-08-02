@@ -177,37 +177,48 @@ func (p *py) Tables(query string) ([]string, error) {
 }
 
 func customMarshalBinds(binds []bindMeta) ([]byte, error) {
-	var result []byte
+	// OPTIMIZATION: Pre-allocate buffer to avoid multiple allocations
+	totalSize := 0
+	for _, bind := range binds {
+		totalSize += 2 + len(bind.Path) + 8 + 8 // pathLen + path + minTime + maxTime
+	}
+	
+	result := make([]byte, 0, totalSize)
 
 	for _, bind := range binds {
 		// Convert path to bytes
 		pathBytes := []byte(bind.Path)
+		pathLen := uint16(len(pathBytes))
+
+		// Ensure we have enough capacity
+		if cap(result)-len(result) < 2+len(pathBytes)+16 {
+			newResult := make([]byte, len(result), cap(result)*2)
+			copy(newResult, result)
+			result = newResult
+		}
 
 		// Path length (int16 little endian)
-		pathLenBytes := make([]byte, 2)
-		binary.LittleEndian.PutUint16(pathLenBytes, uint16(len(pathBytes)))
-		result = append(result, pathLenBytes...)
+		binary.LittleEndian.PutUint16(result[len(result):len(result)+2], pathLen)
+		result = result[:len(result)+2]
 
 		// Path string
 		result = append(result, pathBytes...)
 
 		// MinTime (int64 little endian)
-		minTimeBytes := make([]byte, 8)
 		minTime, ok := bind.Min.(int64)
 		if !ok {
 			return nil, fmt.Errorf("MinTime is not int64")
 		}
-		binary.LittleEndian.PutUint64(minTimeBytes, uint64(minTime))
-		result = append(result, minTimeBytes...)
+		binary.LittleEndian.PutUint64(result[len(result):len(result)+8], uint64(minTime))
+		result = result[:len(result)+8]
 
 		// MaxTime (int64 little endian)
-		maxTimeBytes := make([]byte, 8)
 		maxTime, ok := bind.Max.(int64)
 		if !ok {
 			return nil, fmt.Errorf("MaxTime is not int64")
 		}
-		binary.LittleEndian.PutUint64(maxTimeBytes, uint64(maxTime))
-		result = append(result, maxTimeBytes...)
+		binary.LittleEndian.PutUint64(result[len(result):len(result)+8], uint64(maxTime))
+		result = result[:len(result)+8]
 	}
 
 	return result, nil

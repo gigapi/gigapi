@@ -108,9 +108,61 @@ func testE2EReading(t *testing.T) {
 		`{"results":[{"database_name":"default"}]}`,
 		`{"results":[{"table_name":"logs"}]}`,
 	}
-	for i, reqBody := range requests {
-		res, err := http.Post("http://localhost:7988/query?db=default&format=json", "application/json",
-			bytes.NewBuffer([]byte(reqBody)))
+	
+	// Test both query endpoints with different format options
+	endpoints := []string{
+		"http://localhost:7988/query?db=default&format=json",
+		"http://localhost:7988/api/v3/query_sql?db=default&format=json",
+		"http://localhost:7988/query?db=default&format=JSON", // Test case-insensitive
+		"http://localhost:7988/api/v3/query_sql?db=default&format=JSON", // Test case-insensitive
+		"http://localhost:7988/query?db=default", // Test default format (no format parameter)
+		"http://localhost:7988/api/v3/query_sql?db=default", // Test default format (no format parameter)
+	}
+	
+	for _, endpoint := range endpoints {
+		for i, reqBody := range requests {
+			res, err := http.Post(endpoint, "application/json",
+				bytes.NewBuffer([]byte(reqBody)))
+			if err != nil {
+				panic(err)
+			}
+			if res.StatusCode/100 != 2 {
+				body, _ := io.ReadAll(res.Body)
+				panic(fmt.Sprintf("[%d]: %s", res.StatusCode, string(body)))
+			}
+			body, err := io.ReadAll(res.Body)
+			if err != nil {
+				panic(err)
+			}
+			strBody := strings.TrimSpace(string(body))
+			fmt.Println(strBody)
+			if strBody != responses[i] {
+				panic(fmt.Sprintf("Unexpected response: `%s`", strBody))
+			}
+		}
+	}
+
+	// Test NDJSON and JSONL formats
+	ndjsonEndpoints := []string{
+		"http://localhost:7988/query?db=default&format=ndjson",
+		"http://localhost:7988/api/v3/query_sql?db=default&format=ndjson",
+		"http://localhost:7988/query?db=default&format=jsonl",
+		"http://localhost:7988/api/v3/query_sql?db=default&format=jsonl",
+		"http://localhost:7988/query?db=default&format=NDJSON", // Test case-insensitive
+		"http://localhost:7988/api/v3/query_sql?db=default&format=JSONL", // Test case-insensitive
+	}
+	
+	// Test CSV format
+	csvEndpoints := []string{
+		"http://localhost:7988/query?db=default&format=csv",
+		"http://localhost:7988/api/v3/query_sql?db=default&format=csv",
+		"http://localhost:7988/query?db=default&format=CSV", // Test case-insensitive
+		"http://localhost:7988/api/v3/query_sql?db=default&format=CSV", // Test case-insensitive
+	}
+	
+	for _, endpoint := range ndjsonEndpoints {
+		res, err := http.Post(endpoint, "application/json",
+			bytes.NewBuffer([]byte(`{"query": "SELECT count() as c FROM logs"}`)))
 		if err != nil {
 			panic(err)
 		}
@@ -123,9 +175,35 @@ func testE2EReading(t *testing.T) {
 			panic(err)
 		}
 		strBody := strings.TrimSpace(string(body))
-		fmt.Println(strBody)
-		if strBody != responses[i] {
-			panic(fmt.Sprintf("Unexpected response: `%s`", strBody))
+		fmt.Println("NDJSON/JSONL response:", strBody)
+		// NDJSON format should not have the "results" wrapper
+		if strings.Contains(strBody, `"results"`) {
+			panic(fmt.Sprintf("NDJSON response should not contain 'results' wrapper: `%s`", strBody))
+		}
+	}
+	
+	for _, endpoint := range csvEndpoints {
+		res, err := http.Post(endpoint, "application/json",
+			bytes.NewBuffer([]byte(`{"query": "SELECT count() as c FROM logs"}`)))
+		if err != nil {
+			panic(err)
+		}
+		if res.StatusCode/100 != 2 {
+			body, _ := io.ReadAll(res.Body)
+			panic(fmt.Sprintf("[%d]: %s", res.StatusCode, string(body)))
+		}
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			panic(err)
+		}
+		strBody := strings.TrimSpace(string(body))
+		fmt.Println("CSV response:", strBody)
+		// CSV format should not have the "results" wrapper and should contain commas
+		if strings.Contains(strBody, `"results"`) {
+			panic(fmt.Sprintf("CSV response should not contain 'results' wrapper: `%s`", strBody))
+		}
+		if !strings.Contains(strBody, ",") {
+			panic(fmt.Sprintf("CSV response should contain commas: `%s`", strBody))
 		}
 	}
 
