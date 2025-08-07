@@ -11,7 +11,17 @@ Like a durable parquet floor, GigAPI provides rock-solid data foundation for you
 > GigAPI is a timeseries optimized "lakehouse" designed for realtime data - lots of it - and returning queries as fast as possible. By combining DuckDB's performance, FlightSQL efficiency and Parquet's reliablity with smart metadata we've created a simple, lightweight solution ready to decimate complexity and infrastructure costs for ourselves and others.
 > GigAPI is _100% opensource - no open core or cloud product gimmicks_.
 
+### How to migrate from the gigapi-main version
 
+Only filesystem with json metadata is supported for now
+
+1. cd to the data folder
+2. ls - discover the databases
+3. cd to each database
+4. create `master` schema - `mkdir master`
+5. move tables to the master schama `mv * master/`
+
+Gigapi should autodiscover the tables and all the data.
 
 ### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=18 /> GigAPI Features
 
@@ -41,36 +51,36 @@ services:
       - "7971:7971"
     environment:
       - GIGAPI_ROOT=/data
-      - GIGAPI_LAYERS_0_NAME=default
-      - GIGAPI_LAYERS_0_TYPE=fs
-      - GIGAPI_LAYERS_0_URL=file:///data
+      # - GIGAPI_LAYERS_0_NAME=default - TBD
+      # - GIGAPI_LAYERS_0_TYPE=fs - TBD
+      # - GIGAPI_LAYERS_0_URL=file:///data - TBD
 ```
 ### <img src="https://github.com/user-attachments/assets/a9aa3ebd-9164-476d-aedf-97b817078350" width=18 /> Settings
 
-| Env Var Name               | Description                                                         | Default Value |
-|----------------------------|---------------------------------------------------------------------|---------------|
-| `GIGAPI_ROOT`              | Root folder for all the data files                                  |               |
-| `GIGAPI_MERGE_TIMEOUT_S`   | Base timeout between merges (in seconds)                            | `10`          |
-| `GIGAPI_SAVE_TIMEOUT_S`    | Timeout before saving the new data to the disk (in seconds)         | `1`           |
-| `GIGAPI_NO_MERGES`         | Disable merging                                                     | `false`       |
-| `GIGAPI_UI`                | Enable UI for querier                                               | `true`        |
-| `GIGAPI_MODE`              | Execution mode (`readonly`, `writeonly`, `compaction`, `aio`)       | `"aio"`       |
-| `GIGAPI_METADATA_TYPE`     | Metadata Type (`json` for local, `redis` for distributed)           | `"json"`      |
-| `GIGAPI_METADATA_URL`      | Metadata Type URL for redis (ie: `redis://redis:6379/0`             |               |
-| `HTTP_PORT`                | Port to listen on for HTTP server                                   | `7971`        |
-| `HTTP_HOST`                | Host to bind to for HTTP server                                     | `"0.0.0.0"`   |
-| `HTTP_BASIC_AUTH_USERNAME` | Username for HTTP basic authentication                              |               |
-| `HTTP_BASIC_AUTH_PASSWORD` | Password for HTTP basic authentication                              |               |
-| `FLIGHTSQL_PORT`           | Port to run FlightSQL server                                        | `8082`        |
-| `FLIGHTSQL_ENABLE`         | Enable FlightSQL server                                             | `true`        |
-| `LOGLEVEL`                 | Log level (debug, info, warn, error, fatal)                         | `"info"`      |
-| `DUCKDB_MEM_LIMIT`         | DuckDB memory limit (e.g. 1GB)                                      | `"1GB"`       |
-| `DUCKDB_THREAD_LIMIT`      | DuckDB thread limit (int)                                           | `1`           |
-| `GIGAPI_LAYER_X_NAME`      | X - layer index from 0. Layer unique name.                          |               |
-| `GIGAPI_LAYER_X_TYPE`      | `fs` for file system, `s3` for s3                                   |               |
-| `GIGAPI_LAYER_X_GLOBAL`    | `true` if all the cluster has an access to the layer                |               |
-| `GIGAPI_LAYER_X_URL`       | path or url to s3                                                   |               |
-| `GIGAPI_LAYER_X_TTL`       | timeout before send data to the next layer or drop it 0 for no drop | `0`           |
+| Env Var Name               | Description                                                         | Default Value | In progress |
+|----------------------------|---------------------------------------------------------------------|---------------|-------------|
+| `GIGAPI_ROOT`              | Root folder for all the data files                                  |               | Done        |
+| `GIGAPI_MERGE_TIMEOUT_S`   | Base timeout between merges (in seconds)                            | `10`          | In progress |
+| `GIGAPI_SAVE_TIMEOUT_S`    | Timeout before saving the new data to the disk (in seconds)         | `1`           | Discounted  |
+| `GIGAPI_NO_MERGES`         | Disable merging                                                     | `false`       | Done        |
+| `GIGAPI_UI`                | Enable UI for querier                                               | `true`        | Done        |
+| `GIGAPI_MODE`              | Execution mode (`readonly`, `writeonly`, `compaction`, `aio`)       | `"aio"`       | In progress |
+| `GIGAPI_METADATA_TYPE`     | Metadata Type (`local` for local, `redis` for distributed)          | `"json"`      | local only  | 
+| `GIGAPI_METADATA_URL`      | Metadata Type URL for redis (ie: `redis://redis:6379/0`             |               | In progress |
+| `HTTP_PORT`                | Port to listen on for HTTP server                                   | `7971`        | Done        |
+| `HTTP_HOST`                | Host to bind to for HTTP server                                     | `"0.0.0.0"`   | Done        |
+| `HTTP_BASIC_AUTH_USERNAME` | Username for HTTP basic authentication                              |               | In progress |
+| `HTTP_BASIC_AUTH_PASSWORD` | Password for HTTP basic authentication                              |               | In progress |
+| `FLIGHTSQL_PORT`           | Port to run FlightSQL server                                        | `8082`        | In progress |
+| `FLIGHTSQL_ENABLE`         | Enable FlightSQL server                                             | `true`        | In progress |
+| `LOGLEVEL`                 | Log level (debug, info, warn, error, fatal)                         | `"info"`      | In progress |
+| `DUCKDB_MEM_LIMIT`         | DuckDB memory limit (e.g. 1GB)                                      | `"1GB"`       | In progress |
+| `DUCKDB_THREAD_LIMIT`      | DuckDB thread limit (int)                                           | `1`           | In progress |
+| `GIGAPI_LAYER_X_NAME`      | X - layer index from 0. Layer unique name.                          |               | In progress |
+| `GIGAPI_LAYER_X_TYPE`      | `fs` for file system, `s3` for s3                                   |               | In progress |
+| `GIGAPI_LAYER_X_GLOBAL`    | `true` if all the cluster has an access to the layer                |               | In progress |
+| `GIGAPI_LAYER_X_URL`       | path or url to s3                                                   |               | In progress |
+| `GIGAPI_LAYER_X_TTL`       | timeout before send data to the next layer or drop it 0 for no drop | `0`           | In progress |
 
 > You can override the defaults by setting these environment variables before starting the service.
 
@@ -366,7 +376,7 @@ graph TD
 
 [![Stargazers for @metrico/quackpipe](https://reporoster.com/stars/gigapi/gigapi)](https://github.com/gigapi/gigapi/stargazers)
 
-###### :black_joker: Disclaimers 
+###### :black_joker: Disclaimers
 
 [^1]: DuckDB ® is a trademark of DuckDB Foundation. All rights reserved by their respective owners. [^1]
 [^2]: ClickHouse ® is a trademark of ClickHouse Inc. No direct affiliation or endorsement. [^2]

@@ -1,2 +1,4 @@
 /examples/mil_rows/_data/
+.env
 /py/.env
+/go/

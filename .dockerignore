@@ -1,2 +1,11 @@
 _data
 gigapi_env
+.venv
+go
+gigapi
+.github
+__init__.build
+__init__.dist
+_testdata
+.idea
+.git
