@@ -4,7 +4,7 @@ go 1.24.2
 
 require (
 	github.com/apache/arrow-go/v18 v18.3.0
-	github.com/expr-lang/expr v1.17.2
+	github.com/expr-lang/expr v1.17.6
 	github.com/gigapi/gigapi-config v0.0.9
 	github.com/gigapi/gigapi-querier v0.0.27
 	github.com/gigapi/metadata v0.0.6
