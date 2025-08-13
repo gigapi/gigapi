@@ -1,3 +1,4 @@
+import time
 from dataclasses import dataclass, field, asdict
 import pyarrow as pa
 import pyarrow.flight as flight
@@ -7,6 +8,7 @@ from .constants import event_timestamp_column, default_schema_name
 from .flight_descriptor import FlightDescriptorParts, ObjectTypeName
 from .utils import CaseInsensitiveDict
 from icecream import ic
+from enum import Enum
 
 
 def encode_custom(obj):
@@ -15,19 +17,6 @@ def encode_custom(obj):
         return {
             "__custom__": "TableFile",
             "data": state
-        }
-    elif isinstance(obj, (DatabaseLibrary, DatabaseContents, SchemaCollection)):
-        state = obj.__getstate__()
-
-        return {
-            "__custom__": obj.__class__.__name__,
-            "data": state
-        }
-    elif isinstance(obj, TableInfo):
-        data = obj.__getstate__()
-        return {
-            "__custom__": "TableInfo",
-            "data": data
         }
     elif isinstance(obj, CaseInsensitiveDict):
         return {
@@ -60,28 +49,38 @@ def encode_custom(obj):
             "__custom__": "Int64Scalar",
             "data": obj.as_py()
         }
+    elif isinstance(obj, MergePlan):
+        return {
+            "__custom__": "MergePlan",
+            "data": obj.__getstate__()
+        }
+    elif isinstance(obj, MergePlansByFolder):
+        state = obj.__getstate__()
+        return {
+            "__custom__": "MergePlansByFolder",
+            "data": state
+        }
+    elif isinstance(obj, MergePlanState):
+        return {
+            "__custom__": "MergePlanState",
+            "data": obj.value
+        }
+    elif isinstance(obj, DeletePlan):
+        return {
+            "__custom__": "DeletePlan",
+            "data": asdict(obj)
+        }
+    elif isinstance(obj, DeletePlans):
+        return {
+            "__custom__": "DeletePlans",
+            "data": obj.__getstate__()
+        }
     return obj
 
 def decode_custom(obj):
     if isinstance(obj, dict) and "__custom__" in obj:
         class_name = obj["__custom__"]
-        if class_name == "DatabaseLibrary":
-            result = DatabaseLibrary.__new__(DatabaseLibrary)
-            result.__setstate__(obj["data"])
-            return result
-        elif class_name == "DatabaseContents":
-            result = DatabaseContents.__new__(DatabaseContents)
-            result.__setstate__(obj["data"])
-            return result
-        elif class_name == "SchemaCollection":
-            result = SchemaCollection.__new__(SchemaCollection)
-            result.__setstate__(obj["data"])
-            return result
-        elif class_name == "TableInfo":
-            result = TableInfo.__new__(TableInfo)
-            result.__setstate__(obj["data"])
-            return result
-        elif class_name == "TableFile":
+        if class_name == "TableFile":
             result = TableFile.__new__(TableFile)
             result.__setstate__(obj["data"])
             return result
@@ -100,6 +99,18 @@ def decode_custom(obj):
                 return None
         elif class_name == "Int64Scalar":
             return pa.scalar(obj["data"], type=pa.int64())
+        elif class_name == "MergePlan":
+            result = MergePlan.__new__(MergePlan)
+            result.__setstate__(obj["data"])
+            return result
+        elif class_name == "MergePlansByFolder":
+            return MergePlansByFolder(**obj["data"])
+        elif class_name == "MergePlanState":
+            return MergePlanState(obj["data"])
+        elif class_name == "DeletePlan":
+            return DeletePlan(**obj["data"])
+        elif class_name == "DeletePlans":
+            return DeletePlans(**obj["data"])
     return obj
 
 
@@ -137,165 +148,51 @@ class MetaStore:
     def load(self):
         pass
 
-@dataclass
-class TableInfo:
-    # This is a list of parquet files.
-    table_schema: pa.Schema
-
-    contents: list[TableFile] = field(default_factory=list)
-
-    table_versions: list[pa.Table] = field(default_factory=list)
-
-    meta_store: MetaStore | None = field(default=None, repr=False, compare=False)
-
-    def update_table(self, table: pa.Table) -> None:
-        assert table is not None
-        assert isinstance(table, pa.Table)
-        self.table_versions.append(table)
-
-    def update_table_schema(self, schema: pa.Schema) -> None:
-        assert isinstance(schema, pa.Schema)
-        self.table_schema = schema
-        self.meta_store.on_schema_update()
-
-    def alter_table_files(self, added: list[TableFile], removed: list[TableFile]) -> None:
-        self.meta_store.on_files_update(added, removed)
-        self.contents.extend(added)
-        for file in removed:
-            self.contents = [f for f in self.contents if f.filename!= file.filename]
-
-    def version(self, version: int | None = None) -> pa.Table:
-        """
-        Get the version of the table.
-        """
-        assert len(self.table_versions) > 0
-        if version is None:
-            return self.table_versions[-1]
-
-        assert version < len(self.table_versions)
-        return self.table_versions[version]
-
-    def flight_info(
-            self,
-            *,
-            name: str,
-            catalog_name: str,
-            schema_name: str,
-    ) -> tuple[flight.FlightInfo, flight_inventory.FlightSchemaMetadata]:
-        """
-        Often its necessary to create a FlightInfo object for the table,
-        standardize doing that here.
-        """
-        metadata = flight_inventory.FlightSchemaMetadata(
-            type="table",
-            catalog=catalog_name,
-            schema=schema_name,
-            name=name,
-            comment=None,
-        )
-        flight_info = flight.FlightInfo(
-            self.table_schema,
-            FlightDescriptorParts.pack(FlightDescriptorParts(catalog_name, schema_name, "table", name)),
-            [],
-            -1,
-            -1,
-            app_metadata=metadata.serialize(),
-        )
-        return (flight_info, metadata)
-
-    def __getstate__(self):
-        return {
-            "table_schema": self.table_schema,
-            "contents": self.contents,
-        }
-
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-
-
-@dataclass
-class SchemaCollection:
-    tables_by_name: CaseInsensitiveDict[TableInfo] = field(default_factory=CaseInsensitiveDict[TableInfo])
-
-    def containers(
-            self,
-    ) -> list[CaseInsensitiveDict[TableInfo]]:
-        return [
-            self.tables_by_name,
-        ]
-
-    def by_name(self, type: ObjectTypeName, name: str) -> TableInfo:
-        assert name is not None
-        assert name != ""
-        if type == "table":
-            table = self.tables_by_name.get(name)
-            if not table:
-                raise flight.FlightServerError(f"Table {name} does not exist.")
-            return table
-
-    def __getstate__(self):
-            return asdict(self)
-
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-
-
-@dataclass
-class DatabaseContents:
-    # Collection of schemas by name.
-    schemas_by_name: CaseInsensitiveDict[SchemaCollection] = field(
-        default_factory=CaseInsensitiveDict[SchemaCollection]
-    )
-
-    # The version of the database, updated on each schema change.
-    version: int = 1
-
-    def by_name(self, name: str | None) -> SchemaCollection:
-        if name is None or name == "":
-            name = default_schema_name
-        if name not in self.schemas_by_name:
-            raise flight.FlightServerError(f"Schema {name} does not exist.")
-        return self.schemas_by_name[name]
-
-    def __getstate__(self):
-        return asdict(self)
-
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-
-
-@dataclass
-class DatabaseLibrary:
-    """
-    The database library, which contains all of the databases, organized by token.
-    """
-
-    # Collection of databases by token.
-    databases_by_name: CaseInsensitiveDict[DatabaseContents] = field(
-        default_factory=CaseInsensitiveDict[DatabaseContents]
-    )
-
-    def by_name(self, name: str) -> DatabaseContents:
-        if name not in self.databases_by_name:
-            raise flight.FlightServerError(f"Database {name} does not exist.")
-        return self.databases_by_name[name]
-
-    def __getstate__(self):
-        return {"databases_by_name": dict(self.databases_by_name)}
-
-    def __setstate__(self, state):
-        self.databases_by_name = CaseInsensitiveDict(state["databases_by_name"])
+class MergePlanState(Enum):
+    IDLE = 1
+    PROCESSING = 2
+    DONE = 3
 
 @dataclass
 class MergePlan:
+    database_name: str
+    schema_name: str
+    table_name: str
     from_table_files: list[TableFile] = field(default_factory=list)
     from_file_paths: list[str] = field(default_factory=list)
     size_bytes: int = 0
     to_file_path: str = ""
     iteration: int = 0
+    state: MergePlanState = field(default=MergePlanState.IDLE)
+    created_at: float = field(default_factory=time.time)
 
     def __getstate__(self):
-        return asdict(self)
+        d = asdict(self)
+        d["from_table_files"] = self.from_table_files
+        return d
 
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+
+@dataclass
+class MergePlansByFolder:
+    merge_plans: dict[str, list[MergePlan]] = field(default_factory=dict)
+    def __getstate__(self):
+        return {
+            "merge_plans": self.merge_plans
+        }
+
+@dataclass
+class DeletePlan:
+    file_path: str
+    created_at: float = field(default_factory=time.time)
+
+@dataclass
+class DeletePlans:
+    delete_files: list[DeletePlan] = field(default_factory=list)
+    def __getstate__(self):
+        return {
+            "delete_files": self.delete_files
+        }
     def __setstate__(self, state):
         self.__dict__.update(state)

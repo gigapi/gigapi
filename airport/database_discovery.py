@@ -16,7 +16,7 @@ import os
 import json
 
 from .metadata_file_store import MetadataFileStore
-from .model import DatabaseLibrary, DatabaseContents, TableInfo, TableFile, SchemaCollection
+from .table import DatabaseLibrary, DatabaseContents, TableInfo, TableFile, SchemaCollection
 import pyarrow.parquet as pq
 from icecream import ic
 import pyarrow as pa
@@ -54,9 +54,10 @@ def discover_databases(root):
             return None
 
         db_schema = schema
-        schema = parse_schema(files[0].filename)
+        filename = lambda x: x if x.startswith("/") else os.path.join(root, database, db_schema, table_name, x)
+        schema = parse_schema(filename(files[0].filename))
         for file in files[1:]:
-            schema = merge_schema(schema, parse_schema(file.filename))
+            schema = merge_schema(schema, parse_schema(filename(file.filename)))
 
 
 
@@ -81,7 +82,7 @@ def discover_databases(root):
                 for table_name in os.listdir(schema_path):
                     table_path = os.path.join(schema_path, table_name)
                     if os.path.isdir(table_path):
-                        data_path = os.path.join(table_path, "data")
+                        data_path = os.path.join(table_path)
                         data_path = data_path if os.path.exists(data_path) else table_path
                         if not os.path.isdir(data_path):
                             continue
@@ -96,7 +97,7 @@ def discover_databases(root):
 
 def parse_metadata(table_path, metadata):
     return [TableFile(
-        filename=str(os.path.join(table_path, f["path"])),
+        filename=str(os.path.join("data", f["path"])),
         event_timestamp_column="__timestamp",
         event_timestamp_min=pa.scalar(f["min_time"], pa.int64()),
         event_timestamp_max=pa.scalar(f["max_time"], pa.int64()),

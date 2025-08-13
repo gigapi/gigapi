@@ -33,10 +33,15 @@ from query_farm_flight_server.parameter_types import unpack_with_model
 from query_farm_flight_server.server import ActionHandlerSpec, CallContext
 
 from .constants import event_timestamp_column, ingest_timestamp_column, default_schema_name
+from .delete_orchestrator import DeleteOrchestrator
+from .delete_planner import DeletePlanner
 from .flight_descriptor import FlightDescriptorParts, ObjectTypeName
+from .merge_orchestrator import MergeOrchestrator
+from .merge_planner import MergePlanner
 from .metadata_file_store import MetadataFileStore
 from .utils import CaseInsensitiveDict
-from .model import TableFile, TableInfo, SchemaCollection, DatabaseContents, DatabaseLibrary, encode_custom
+from .model import TableFile
+from .table import TableInfo, SchemaCollection, DatabaseContents, DatabaseLibrary
 from .database_discovery import discover_databases
 
 from icecream import ic
@@ -123,6 +128,16 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
             self.contents: DatabaseLibrary = discover_databases(self.base_path)
         else:
             self.contents: DatabaseLibrary = DatabaseLibrary()
+
+        self.merge_orchestrator = MergeOrchestrator()
+        self.delete_orchestrator = DeleteOrchestrator()
+        for schemas in self.contents.databases_by_name.values():
+            for schema in schemas.schemas_by_name.values():
+                for table_info in schema.tables_by_name.values():
+                    if table_info.merge_planner is not None:
+                        self.merge_orchestrator.add_planner(table_info)
+                        self.delete_orchestrator.add_planner(table_info.delete_planner)
+
 
     def action_list_schemas(
         self,
@@ -342,7 +357,14 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
         assert event_timestamp_column not in actual_schema.names
         actual_schema = actual_schema.append(pa.field(event_timestamp_column, pa.timestamp("ns")))
 
-        table_info = TableInfo(table_schema=actual_schema)
+        table_info = TableInfo(
+            table_schema=actual_schema,
+            merge_planner=MergePlanner(
+                self.base_path, parameters.catalog_name, parameters.schema_name, parameters.table_name
+            ),
+            delete_planner=DeletePlanner(
+                self.base_path, parameters.catalog_name, parameters.schema_name, parameters.table_name
+            ))
         os.makedirs(os.path.join(self.base_path, parameters.catalog_name, parameters.schema_name,
                                  parameters.table_name), exist_ok=True)
         table_info.meta_store = MetadataFileStore(self.base_path,
@@ -352,6 +374,9 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
         schema.tables_by_name[parameters.table_name] = table_info
 
         database.version += 1
+
+        self.merge_orchestrator.add_planner(table_info)
+        self.delete_orchestrator.add_planner(table_info.delete_planner)
 
         return table_info.flight_info(
             name=parameters.table_name,
@@ -392,15 +417,14 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
             return iter([])
 
         raise flight.FlightServerError(f"Unsupported action type: {action.type}")
-
     def exchange_insert(
-        self,
-        *,
-        context: base_server.CallContext[auth.Account, auth.AccountToken],
-        descriptor: flight.FlightDescriptor,
-        reader: flight.MetadataRecordBatchReader,
-        writer: flight.MetadataRecordBatchWriter,
-        return_chunks: bool,
+            self,
+            *,
+            context: base_server.CallContext[auth.Account, auth.AccountToken],
+            descriptor: flight.FlightDescriptor,
+            reader: flight.MetadataRecordBatchReader,
+            writer: flight.MetadataRecordBatchWriter,
+            return_chunks: bool,
     ) -> int:
         assert context.caller is not None
 
@@ -416,70 +440,181 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
         writer.begin(table_info.table_schema)
         change_count = 0
 
-        # DuckDB won't send field metadata when it sends us the schema that it uses
-        # to perform an insert, so we need some way to adapt the schema we
         check_schema_is_subset_of_schema(table_info.table_schema, reader.schema)
-
-        # Open up a new parquet writer u
-
-        output_path = os.path.join(self.base_path, descriptor_parts.catalog_name,
-              descriptor_parts.schema_name, descriptor_parts.name, f"{uuid.uuid4()}.parquet")
-        directory_base = os.path.dirname(output_path)
-
-        os.makedirs(directory_base, exist_ok=True)
 
         ingest_time = datetime.now(pytz.UTC)
         ingest_time_scalar = pa.scalar(ingest_time, type=pa.timestamp("ns"))
 
-        with pq.ParquetWriter(output_path, schema=table_info.table_schema) as parquet_writer:
-            event_timestamp_min = None #pa.scalar(None, type=pa.timestamp("ns"))
-            event_timestamp_max = None #pa.scalar(None, type=pa.timestamp("ns"))
+        table_files = []
+        event_timestamp_min = None
+        event_timestamp_max = None
 
-            for chunk in reader:
-                if chunk.data is not None:
-                    new_rows = pa.Table.from_batches([chunk.data])
-                    assert new_rows.num_rows > 0
+        for chunk in reader:
+            if chunk.data is not None:
+                new_rows = pa.Table.from_batches([chunk.data])
+                assert new_rows.num_rows > 0
 
-                    # append the row id column to the new rows.
-                    chunk_length = new_rows.num_rows
+                change_count += new_rows.num_rows
 
-                    change_count += chunk_length
+                new_rows = conform_nullable(table_info.table_schema, new_rows)
 
-                    new_rows = conform_nullable(table_info.table_schema, new_rows)
+                timestamp_array = pa.repeat(ingest_time_scalar, new_rows.num_rows)
 
-                    timestamp_array = pa.repeat(ingest_time_scalar, new_rows.num_rows)
+                if ingest_timestamp_column in new_rows.column_names:
+                    new_rows = new_rows.drop(ingest_timestamp_column)
+                new_rows = new_rows.append_column(ingest_timestamp_column, timestamp_array)
 
-                    # Add the ingest timestamp column to the new rows.
-                    if ingest_timestamp_column in new_rows.column_names:
-                        new_rows = new_rows.drop(ingest_timestamp_column)
-                    new_rows = new_rows.append_column(ingest_timestamp_column, timestamp_array)
+                new_rows = new_rows.select(table_info.table_schema.names)
 
-                    new_rows = new_rows.select(table_info.table_schema.names)
+                assert event_timestamp_column in new_rows.column_names
+                min_max = pc.min_max(new_rows[event_timestamp_column])
 
-                    assert event_timestamp_column in new_rows.column_names
-                    min_max = pc.min_max(new_rows[event_timestamp_column])
+                event_timestamp_min = pc.min(pa.array([event_timestamp_min, min_max["min"]])) \
+                    if event_timestamp_min is not None else min_max["min"]
+                event_timestamp_max = pc.max(pa.array([event_timestamp_max, min_max["max"]])) \
+                    if event_timestamp_max is not None else min_max["max"]
 
-                    # So we want to get the min and max event time for the event_timestamp
+                # Split the data by hour
+                if pa.types.is_integer(new_rows[event_timestamp_column].type):
+                    timestamps = new_rows[event_timestamp_column].cast(pa.timestamp('ns'))
+                else:
+                    timestamps = new_rows[event_timestamp_column]
+                hours = pc.floor_temporal(timestamps, unit="hour")
+                unique_hours = pc.unique(hours)
 
-                    event_timestamp_min = pc.min(pa.array([event_timestamp_min, min_max["min"]])) \
-                        if event_timestamp_min is not None else min_max["min"]
-                    event_timestamp_max = pc.max(pa.array([event_timestamp_max, min_max["max"]])) \
-                        if event_timestamp_max is not None else min_max["max"]
-                    # TimestampScalar
-                    parquet_writer.write_table(new_rows)
+                for hour in unique_hours:
+                    if isinstance(hour, pa.TimestampScalar):
+                        hour_dt = hour.as_py()
+                    else:
+                        # If it's not a TimestampScalar, assume it's a nanosecond timestamp
+                        hour_dt = datetime.fromtimestamp(hour.as_py() / 1e9, pytz.UTC)
+                    date_str = hour_dt.strftime("%Y-%m-%d")
+                    hour_str = hour_dt.strftime("%H")
 
-                    if return_chunks:
-                        writer.write_table(new_rows)
+                    mask = pc.equal(hours, hour)
+                    hour_chunk = new_rows.filter(mask)
 
-        # Along with adding the file we should update the metadata.
-        table_info.alter_table_files([
-            TableFile(
-                filename=output_path,
-                event_timestamp_min=event_timestamp_min,
-                event_timestamp_max=event_timestamp_max,
-            )
-        ], [])
+                    rel_dir = os.path.join(
+                        "data",
+                        f"date={date_str}",
+                        f"hour={hour_str}").strip("/")
+
+                    output_dir = os.path.join(
+                        self.base_path,
+                        descriptor_parts.catalog_name,
+                        descriptor_parts.schema_name,
+                        descriptor_parts.name,
+                        rel_dir
+                    )
+                    os.makedirs(output_dir, exist_ok=True)
+
+                    file_name = f"{uuid.uuid4()}.parquet"
+                    rel_path = os.path.join(rel_dir, file_name)
+                    output_path = os.path.join(output_dir, file_name)
+
+                    pq.write_table(hour_chunk, output_path)
+
+                    table_files.append(
+                        TableFile(
+                            filename=rel_path,
+                            event_timestamp_min=pc.min(hour_chunk[event_timestamp_column]),
+                            event_timestamp_max=pc.max(hour_chunk[event_timestamp_column]),
+                        )
+                    )
+
+                if return_chunks:
+                    writer.write_table(new_rows)
+
+        # Update the metadata
+        table_info.alter_table_files(table_files, [])
         return change_count
+#    def exchange_insert(
+#        self,
+#        *,
+#        context: base_server.CallContext[auth.Account, auth.AccountToken],
+#        descriptor: flight.FlightDescriptor,
+#        reader: flight.MetadataRecordBatchReader,
+#        writer: flight.MetadataRecordBatchWriter,
+#        return_chunks: bool,
+#    ) -> int:
+#        assert context.caller is not None
+#
+#        descriptor_parts = FlightDescriptorParts.unpack(descriptor)
+#
+#        if descriptor_parts.type != "table":
+#            raise flight.FlightServerError(f"Unsupported descriptor type: {descriptor_parts.type}")
+#        library = self.contents
+#        database = library.by_name(descriptor_parts.catalog_name)
+#        schema = database.by_name(descriptor_parts.schema_name)
+#        table_info = schema.by_name("table", descriptor_parts.name)
+#
+#        writer.begin(table_info.table_schema)
+#        change_count = 0
+#
+#        # DuckDB won't send field metadata when it sends us the schema that it uses
+#        # to perform an insert, so we need some way to adapt the schema we
+#        check_schema_is_subset_of_schema(table_info.table_schema, reader.schema)
+#
+#        # Open up a new parquet writer u
+#
+#        output_path = os.path.join(self.base_path, descriptor_parts.catalog_name,
+#              descriptor_parts.schema_name, descriptor_parts.name, f"{uuid.uuid4()}.parquet")
+#        directory_base = os.path.dirname(output_path)
+#
+#        os.makedirs(directory_base, exist_ok=True)
+#
+#        ingest_time = datetime.now(pytz.UTC)
+#        ingest_time_scalar = pa.scalar(ingest_time, type=pa.timestamp("ns"))
+#
+#        with pq.ParquetWriter(output_path, schema=table_info.table_schema) as parquet_writer:
+#            event_timestamp_min = None #pa.scalar(None, type=pa.timestamp("ns"))
+#            event_timestamp_max = None #pa.scalar(None, type=pa.timestamp("ns"))
+#
+#            for chunk in reader:
+#                if chunk.data is not None:
+#                    new_rows = pa.Table.from_batches([chunk.data])
+#                    assert new_rows.num_rows > 0
+#
+#                    # append the row id column to the new rows.
+#                    chunk_length = new_rows.num_rows
+#
+#                    change_count += chunk_length
+#
+#                    new_rows = conform_nullable(table_info.table_schema, new_rows)
+#
+#                    timestamp_array = pa.repeat(ingest_time_scalar, new_rows.num_rows)
+#
+#                    # Add the ingest timestamp column to the new rows.
+#                    if ingest_timestamp_column in new_rows.column_names:
+#                        new_rows = new_rows.drop(ingest_timestamp_column)
+#                    new_rows = new_rows.append_column(ingest_timestamp_column, timestamp_array)
+#
+#                    new_rows = new_rows.select(table_info.table_schema.names)
+#
+#                    assert event_timestamp_column in new_rows.column_names
+#                    min_max = pc.min_max(new_rows[event_timestamp_column])
+#
+#                    # So we want to get the min and max event time for the event_timestamp
+#
+#                    event_timestamp_min = pc.min(pa.array([event_timestamp_min, min_max["min"]])) \
+#                        if event_timestamp_min is not None else min_max["min"]
+#                    event_timestamp_max = pc.max(pa.array([event_timestamp_max, min_max["max"]])) \
+#                        if event_timestamp_max is not None else min_max["max"]
+#                    # TimestampScalar
+#                    parquet_writer.write_table(new_rows)
+#
+#                    if return_chunks:
+#                        writer.write_table(new_rows)
+#
+#        # Along with adding the file we should update the metadata.
+#        table_info.alter_table_files([
+#            TableFile(
+#                filename=output_path,
+#                event_timestamp_min=event_timestamp_min,
+#                event_timestamp_max=event_timestamp_max,
+#            )
+#        ], [])
+#        return change_count
 
     def get_schema_name(self, parameter: str | None):
         return default_schema_name if parameter is None or parameter == "" else parameter
@@ -583,6 +718,11 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
         library = self.contents
         database = library.by_name(descriptor_parts.catalog_name)
         schema = database.by_name(descriptor_parts.schema_name)
+        filename = lambda x: x if x.startswith("/") else os.path.join(self.base_path,
+                                                                      descriptor_parts.catalog_name,
+                                                                      descriptor_parts.schema_name,
+                                                                      descriptor_parts.name,
+                                                                      x)
 
         if descriptor_parts.type == "table":
             table_info = schema.by_name("table", descriptor_parts.name)
@@ -591,7 +731,7 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
                 planner = scan_planner.Planner(
                     [
                         (
-                            i.filename,
+                            filename(i.filename),
                             {
                                 f"{i.event_timestamp_column}": scan_planner.RangeFieldInfo(
                                     min_value=i.event_timestamp_min,
@@ -612,7 +752,7 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
                     )
                 )
                 if filter_sql_where_clause == "" or filter_sql_where_clause is None:
-                    files_to_scan = [i.filename for i in table_info.contents]
+                    files_to_scan = [filename(i.filename) for i in table_info.contents]
                 else:
                     filter_expression = sqlglot.parse_one(
                         f"select * from data where {filter_sql_where_clause}", dialect="duckdb"
@@ -628,13 +768,13 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
                     # So we should get the where clause.
                     where_clause = filter_expression.find(sqlglot.expressions.Where)
                     if where_clause is None:
-                        files_to_scan = [i.filename for i in table_info.contents]
+                        files_to_scan = [filename(i.filename) for i in table_info.contents]
                     else:
                         files_to_scan = list(planner.files(where_clause.this))
                         context.logger.debug("Files to scan", files_to_scan=files_to_scan)
             else:
                 # If there are no filters, we can just return all of the files.
-                files_to_scan = [i.filename for i in table_info.contents]
+                files_to_scan = [filename(i.filename) for i in table_info.contents]
 
             # Lets just return end the parquet files for now.
             ticket_data = FlightTicketData(
