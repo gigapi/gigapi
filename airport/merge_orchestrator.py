@@ -25,10 +25,11 @@ class MergeOrchestrator:
     def __init__(self):
         self.tables: list[TableInfo] = []
         self.timer = None
+        self.working = True
         self.start_timer()
 
     def start_timer(self):
-        if self.timer is None:
+        if self.timer is None and self.working:
             self.timer = threading.Timer(10.0, self.run_merge_iteration)
             self.timer.start()
 
@@ -88,6 +89,7 @@ class MergeOrchestrator:
         self.tables.append(table)
 
     def stop(self):
+        self.working = False
         if self.timer:
             self.timer.cancel()
             self.timer = None

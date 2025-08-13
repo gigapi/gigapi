@@ -5,7 +5,7 @@ import uuid
 from collections.abc import Generator, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Optional
 
 import click
 import msgpack
@@ -836,7 +836,12 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
             )[0]
         else:
             raise flight.FlightServerError(f"Unsupported descriptor type: {descriptor_parts.type}")
+    def shutdown(self) -> None:
+        super().shutdown()
+        self.merge_orchestrator.stop()
+        self.delete_orchestrator.stop()
 
+server: Optional[GigapipeWriterArrowFlightServer] = None
 
 # @click.command()
 # @click.option(
@@ -846,7 +851,7 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
 #     help="The location where the server should listen.",
 # )
 def run(location: str, base_path: str) -> None:
-    print("!!!!! " + base_path)
+    global server
     log.info("Starting server", location=location)
 
     auth_manager = auth_manager_naive.AuthManagerNaive[auth.Account, auth.AccountToken](
@@ -865,3 +870,8 @@ def run(location: str, base_path: str) -> None:
         base_path=base_path
     )
     server.serve()
+
+def shutdown() -> None:
+    global server
+    if server is not None:
+        server.shutdown()

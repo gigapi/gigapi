@@ -7,6 +7,7 @@ from airport.delete_planner import DeletePlanner
 class DeleteOrchestrator:
     def __init__(self):
         self.planners: list[DeletePlanner] = []
+        self.working = True
         self.timer = None
         self.start_timer()
 
@@ -14,7 +15,7 @@ class DeleteOrchestrator:
         self.planners.append(planner)
 
     def start_timer(self):
-        if self.timer is None:
+        if self.timer is None or not self.working:
             self.timer = threading.Timer(10.0, self.run_delete_iteration)
             self.timer.start()
 
@@ -36,3 +37,9 @@ class DeleteOrchestrator:
                 delete_plan = planner.get_delete_plan()
         print(f"Deleted {deleted} files")
         self.start_timer()
+
+    def stop(self):
+        self.working = False
+        if self.timer is not None:
+            self.timer.cancel()
+            self.timer = None

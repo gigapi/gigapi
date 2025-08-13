@@ -19,6 +19,8 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from airport.writer_server import GigapipeWriterArrowFlightServer
+import signal
+import sys
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -57,6 +59,12 @@ app.include_router(reader.router)
 app.include_router(writer.router)
 app.include_router(ui.router)
 
+shutdown_event = asyncio.Event()
+
+def signal_handler(signum, frame):
+    print("Received shutdown signal")
+    writer_server.shutdown()
+
 async def start_background_tasks():
     # Start the run function as a background task
     asyncio.create_task(run())
@@ -75,5 +83,7 @@ def main():
     loop.run_until_complete(server.serve())
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
     main()
     #test_merge_schema()
