@@ -7,8 +7,8 @@ from typing import Optional, Callable
 
 class MergePlanner:
     def __init__(self, base: str, database: str, schema: str, table: str,
-                 merge_plans: MergePlansByFolder = MergePlansByFolder()) -> None:
-        self.merge_plans = merge_plans
+                 merge_plans: Optional[MergePlansByFolder] = None) -> None:
+        self.merge_plans = merge_plans if merge_plans is not None else MergePlansByFolder()
         self.database = database
         self.schema = schema
         self.table = table

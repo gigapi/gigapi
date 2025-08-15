@@ -14,13 +14,13 @@
 
 import os
 import json
+import time
 
 from .delete_planner import DeletePlanner
 from .merge_planner import MergePlanner
 from .metadata_file_store import MetadataFileStore
 from .table import DatabaseLibrary, DatabaseContents, TableInfo, TableFile, SchemaCollection
 import pyarrow.parquet as pq
-from icecream import ic
 import pyarrow as pa
 
 class DatabaseDiscovery:
@@ -69,10 +69,10 @@ class DatabaseDiscovery:
             if meta_store.load() is not None:
                 self.current_schema.tables_by_name[self.current_table_name] = meta_store.table_info
                 return
+        start = time.time()
         self.discover_legacy_table()
         if self.current_table_schema is None:
             return
-
         delete_planner = DeletePlanner(self.root,
                                        self.current_database_name,
                                        self.current_schema_name,
@@ -99,6 +99,7 @@ class DatabaseDiscovery:
         table_info.update_table_schema(self.current_table_schema)
         table_info.alter_table_files(self.current_table_files, [])
         self.current_schema.tables_by_name[self.current_table_name] = table_info
+        print(f"discovered a legacy {self.current_database_name}.{self.current_schema_name}.{self.current_table_name} in {time.time() - start} seconds")
 
     def discover_legacy_table(self):
         table_path = os.path.join(self.root, self.current_database_name, self.current_schema_name, self.current_table_name)
@@ -134,13 +135,22 @@ class DatabaseDiscovery:
             return None
 
     def parse_metadata(self, metadata):
-        return [TableFile(
-            filename=str(os.path.join("data", f["path"])),
-            event_timestamp_column="__timestamp",
-            event_timestamp_min=pa.scalar(f["min_time"], pa.int64()),
-            event_timestamp_max=pa.scalar(f["max_time"], pa.int64()),
-            size_bytes=f["size_bytes"]
-        ) for f in metadata["files"]]
+        res = []
+        for f in metadata["files"]:
+            if os.path.exists(os.path.join(self.root,
+                                           self.current_database_name,
+                                           self.current_schema_name,
+                                           self.current_table_name,
+                                           "data",
+                                           f["path"])):
+                res.append(TableFile(
+                    filename=str(os.path.join("data", f["path"])),
+                    event_timestamp_column="__timestamp",
+                    event_timestamp_min=pa.scalar(f["min_time"], pa.int64()),
+                    event_timestamp_max=pa.scalar(f["max_time"], pa.int64()),
+                    size_bytes=f["size_bytes"]
+                ))
+        return res
 
     def merge_schema(self, schema1, schema2):
         if schema1 is None:

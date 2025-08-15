@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from services.reader import query
 from pydantic import BaseModel, Field
 from datetime import datetime, date
+from asyncio import Lock
 
 router = APIRouter()
 
@@ -77,10 +78,8 @@ async def query_data(db: Optional[str] = Query(None, description="database to qu
         database = query_request.db
     if not database:
         database = ""
-
     # Convert format to lowercase for case-insensitive comparison
     format_lower = format.lower() if format else "json"
-
     if format_lower == "json":
         res = await query(query_request.query, database)
         data = [row async for row in res()]

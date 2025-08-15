@@ -4,13 +4,13 @@ from .model import DeletePlans, DeletePlan
 
 
 class DeletePlanner:
-    def __init__(self, base: str, database: str, schema: str, table: str, delete_plans: DeletePlans = DeletePlans()):
+    def __init__(self, base: str, database: str, schema: str, table: str, delete_plans: Optional[DeletePlans] = None):
         self.base = base
         self.database = database
         self.schema = schema
         self.table = table
         self.on_change: Optional[Callable[['DeletePlanner'], None]] = None
-        self.delete_plans = delete_plans
+        self.delete_plans = delete_plans if delete_plans is not None else DeletePlans()
 
     def normalize_filename(self, filename: str) -> str:
         for rm in [self.base, self.database, self.schema, self.table]:

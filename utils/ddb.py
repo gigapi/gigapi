@@ -13,8 +13,9 @@ from icecream import ic
 memfs = memory.MemoryFileSystem()
 
 class AsyncDuckDBConnection:
-    def __init__(self, conn: duckdb.DuckDBPyConnection):
+    def __init__(self, conn: duckdb.DuckDBPyConnection, temporary: bool = False):
         self.conn = conn
+        self.temporary = temporary
 
     async def aexecute(self, query: str, *args, **kwargs) -> Any:
         loop = asyncio.get_running_loop()
@@ -25,28 +26,33 @@ class AsyncDuckDBConnection:
         return  await loop.run_in_executor(None, functools.partial(self.conn.query, *args, **kwargs))
 
     def close(self):
-        pass
+        if self.temporary:
+            self.conn.close()
 
 
 conn: DuckDBPyRelation | None = None
 
-def connect_duckdb(conn_str: str = None) -> DuckDBPyConnection:
+def connect_duckdb(conn_str: str = None, temporary: bool = False) -> DuckDBPyConnection:
     global conn
     if not conn_str:
         conn_str = get_default_duckdb_conn_str()
-    if not conn:
-        conn = duckdb.connect(conn_str)
-        conn.register_filesystem(memfs)
-    return conn
+    if conn and not temporary:
+        return conn
+    _conn = duckdb.connect(conn_str)
+    _conn.register_filesystem(memfs)
+    if not temporary:
+        conn = _conn
+    return _conn
 
-def connect_airport(conn_str: str = None) -> Tuple[AsyncDuckDBConnection, Callable[[], None]]:
+
+def connect_airport(conn_str: str = None, temporary: bool = False) -> Tuple[AsyncDuckDBConnection, Callable[[], None]]:
     try:
-        if conn is not None:
+        if conn is not None and not temporary:
             aconn = AsyncDuckDBConnection(conn)
             def cancel():
                 aconn.close()
             return aconn, cancel
-        _conn: DuckDBPyConnection = connect_duckdb(conn_str)
+        _conn: DuckDBPyConnection = connect_duckdb(conn_str, temporary)
         if settings.gigapi.metadata.type == "ducklake":
             # Install the ducklake extension
             _conn.execute("INSTALL airport FROM community;")
@@ -82,9 +88,9 @@ CREATE SECRET airport_testing (type airport, auth_token 'example_token', scope '
         raise Exception(f"Failed to connect to DuckDB/Ducklake: {str(e)}")
 
 @asynccontextmanager
-async def async_ducklake_connection(conn_str: str = None):
+async def async_ducklake_connection(conn_str: str = None, temporary: bool = False):
     loop = asyncio.get_running_loop()
-    async_conn, cancel = await loop.run_in_executor(None, functools.partial(connect_airport, conn_str))
+    async_conn, cancel = await loop.run_in_executor(None, functools.partial(connect_airport, conn_str, temporary))
     try:
         yield async_conn
     finally:

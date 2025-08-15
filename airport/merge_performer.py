@@ -1,6 +1,6 @@
 import uuid
 
-from airport.model import TableFile, MergePlan
+from .model import TableFile, MergePlan
 import duckdb
 import os
 from dataclasses import dataclass

@@ -43,6 +43,7 @@ from .utils import CaseInsensitiveDict
 from .model import TableFile
 from .table import TableInfo, SchemaCollection, DatabaseContents, DatabaseLibrary
 from .database_discovery import discover_databases
+from .bunch_of_parquets import BunchOfParquets
 
 from icecream import ic
 
@@ -448,32 +449,26 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
         table_files = []
         event_timestamp_min = None
         event_timestamp_max = None
-
-        for chunk in reader:
-            if chunk.data is not None:
+        with BunchOfParquets(self.base_path, descriptor_parts.catalog_name, descriptor_parts.schema_name,
+                             descriptor_parts.name) as jbop:
+            for chunk in reader:
+                if chunk.data is None:
+                    continue
                 new_rows = pa.Table.from_batches([chunk.data])
                 assert new_rows.num_rows > 0
-
                 change_count += new_rows.num_rows
-
                 new_rows = conform_nullable(table_info.table_schema, new_rows)
-
                 timestamp_array = pa.repeat(ingest_time_scalar, new_rows.num_rows)
-
                 if ingest_timestamp_column in new_rows.column_names:
                     new_rows = new_rows.drop(ingest_timestamp_column)
                 new_rows = new_rows.append_column(ingest_timestamp_column, timestamp_array)
-
                 new_rows = new_rows.select(table_info.table_schema.names)
-
                 assert event_timestamp_column in new_rows.column_names
                 min_max = pc.min_max(new_rows[event_timestamp_column])
-
                 event_timestamp_min = pc.min(pa.array([event_timestamp_min, min_max["min"]])) \
                     if event_timestamp_min is not None else min_max["min"]
                 event_timestamp_max = pc.max(pa.array([event_timestamp_max, min_max["max"]])) \
                     if event_timestamp_max is not None else min_max["max"]
-
                 # Split the data by hour
                 if pa.types.is_integer(new_rows[event_timestamp_column].type):
                     timestamps = new_rows[event_timestamp_column].cast(pa.timestamp('ns'))
@@ -481,7 +476,6 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
                     timestamps = new_rows[event_timestamp_column]
                 hours = pc.floor_temporal(timestamps, unit="hour")
                 unique_hours = pc.unique(hours)
-
                 for hour in unique_hours:
                     if isinstance(hour, pa.TimestampScalar):
                         hour_dt = hour.as_py()
@@ -490,15 +484,12 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
                         hour_dt = datetime.fromtimestamp(hour.as_py() / 1e9, pytz.UTC)
                     date_str = hour_dt.strftime("%Y-%m-%d")
                     hour_str = hour_dt.strftime("%H")
-
                     mask = pc.equal(hours, hour)
                     hour_chunk = new_rows.filter(mask)
-
                     rel_dir = os.path.join(
                         "data",
                         f"date={date_str}",
                         f"hour={hour_str}").strip("/")
-
                     output_dir = os.path.join(
                         self.base_path,
                         descriptor_parts.catalog_name,
@@ -507,24 +498,12 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
                         rel_dir
                     )
                     os.makedirs(output_dir, exist_ok=True)
-
                     file_name = f"{uuid.uuid4()}.parquet"
                     rel_path = os.path.join(rel_dir, file_name)
-                    output_path = os.path.join(output_dir, file_name)
-
-                    pq.write_table(hour_chunk, output_path)
-
-                    table_files.append(
-                        TableFile(
-                            filename=rel_path,
-                            event_timestamp_min=pc.min(hour_chunk[event_timestamp_column]),
-                            event_timestamp_max=pc.max(hour_chunk[event_timestamp_column]),
-                        )
-                    )
-
+                    jbop.write_chunk(rel_path, table_info.table_schema, hour_chunk)
                 if return_chunks:
                     writer.write_table(new_rows)
-
+            table_files = [f.table_file for f in jbop.parquet_files.values()]
         # Update the metadata
         table_info.alter_table_files(table_files, [])
         return change_count

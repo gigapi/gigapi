@@ -1,7 +1,7 @@
 import threading
 
-from airport.delete_performer import FSDeletePerformer
-from airport.delete_planner import DeletePlanner
+from .delete_performer import FSDeletePerformer
+from .delete_planner import DeletePlanner
 
 
 class DeleteOrchestrator:
