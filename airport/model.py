@@ -39,10 +39,9 @@ def encode_custom(obj):
             "data": list(obj)
         }
     elif isinstance(obj, pa.TimestampScalar):
-        obj = obj.as_py()
         return {
             "__custom__": "TimestampScalar",
-            "data": obj.as_py().isoformat() if obj is not None else None
+            "data": obj.value if obj is not None else None
         }
     elif isinstance(obj, pa.Int64Scalar):
         return {
@@ -94,7 +93,7 @@ def decode_custom(obj):
             return set(obj["data"])
         elif class_name == "TimestampScalar":
             if obj["data"] is not None:
-                return pa.scalar(pa.timestamp(obj["data"]))
+                return pa.scalar(obj["data"], pa.timestamp('ns'))
             else:
                 return None
         elif class_name == "Int64Scalar":
