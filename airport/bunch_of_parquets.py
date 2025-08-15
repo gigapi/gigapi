@@ -69,7 +69,7 @@ class BunchOfParquets:
     def close(self):
         for path, writer in self.parquet_files.items():
             try:
-                writer.close()
+                writer.writer.close()
             except Exception as e:
                 print(f"Error closing ParquetWriter for {path}: {str(e)}")
 
