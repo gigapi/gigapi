@@ -67,7 +67,7 @@ def signal_handler(signum, frame):
 
 async def start_background_tasks():
     # Start the run function as a background task
-    asyncio.create_task(run())
+    pass
 
 def run_airport_server():
     print("START")

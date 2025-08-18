@@ -8,6 +8,7 @@ from .merge_planner import MergePlanner
 from .model import MergePlan, MergePlanState, TableFile
 import pyarrow.compute as pc
 import threading
+import time
 
 from .table import TableInfo
 
@@ -27,6 +28,8 @@ class MergeOrchestrator:
         self.timer = None
         self.working = True
         self.start_timer()
+        self.last_merge_cleanup = 0
+        self.current_merge_plans = []
 
     def start_timer(self):
         if self.timer is None and self.working:
@@ -34,6 +37,10 @@ class MergeOrchestrator:
             self.timer.start()
 
     def run_merge_iteration(self):
+        if time.time() - self.last_merge_cleanup > 10:
+            for t in self.tables:
+                t.merge_planner.cleanup()
+            self.last_merge_cleanup = time.time()
         self.merge_iteration()
         self.timer = None
         self.start_timer()
@@ -41,27 +48,28 @@ class MergeOrchestrator:
     def merge_iteration(self):
         print("Running merge iteration...")
         while True:
-            merge_plans = self.get_merge_plans()
-            if len(merge_plans) == 0:
+            self.current_merge_plans = self.get_merge_plans()
+            if len(self.current_merge_plans) == 0:
                 break
             with ThreadPoolExecutor(max_workers=max_merge_processes) as executor:
-                futures = [executor.submit(self.execute_merge, m) for m in merge_plans]
+                futures = [executor.submit(self.execute_merge, m) for m in range(len(self.current_merge_plans))]
                 for future in futures:
                     future.result()
                 print(f"Finished {len(futures)} merges")
 
 
-    def execute_merge(self, m: PlanWrapper):
+    def execute_merge(self, i: int):
         try:
+            m = self.current_merge_plans[i]
             fsm = FSMerger(m.base, m.database, m.schema, m.table)
             fsm.do_merge(m.merge_plan)
-            m.state = MergePlanState.DONE
+            m.merge_plan.state = MergePlanState.DONE
             to_file_abs = os.path.join(m.base, m.database, m.schema, m.table, m.merge_plan.to_file_path)
             event_timestamp_min = pc.min([f.event_timestamp_min for f in m.merge_plan.from_table_files])
             event_timestamp_max = pc.max([f.event_timestamp_max for f in m.merge_plan.from_table_files])
             add_file = TableFile(
                 # TODO: fix the absolute pahts
-                filename=to_file_abs,
+                filename=m.merge_plan.to_file_path,
                 event_timestamp_min=event_timestamp_min,
                 event_timestamp_max=event_timestamp_max,
                 size_bytes = fsm.get_file_size(to_file_abs)
