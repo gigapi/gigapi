@@ -44,9 +44,15 @@ async def write_lineproto(data: bytes, database: str):
 
 async def prepare_table(conn: AsyncDuckDBConnection, table: str, fields):
     tables = (await conn.aquery("SHOW TABLES;")).fetchall()
-    if table not in [row[0] for row in tables]:
-        await conn.aexecute(f"CREATE TABLE {table} ({', '.join([f'{field[0]} {field[1]}' 
-            for field in fields if not field[0].startswith("__")])});")
+    if tables is None or table not in [row[0] for row in tables]:
+        try:
+            await conn.aexecute(f"CREATE TABLE {table} ({', '.join([f'{field[0]} {field[1]}' 
+                for field in fields if not field[0].startswith("__")])});")
+        except Exception as e:
+            if str(e).startswith("Table") and "already exists" in str(e):
+                pass
+            else:
+                raise e
     existing_fields = (await conn.aquery(f"DESCRIBE {table};")).fetchall()
     absent_fields = [field for field in fields if field[0] not in [f[0] for f in existing_fields]]
     if [f for f in absent_fields if f[0].startswith("__")]:
