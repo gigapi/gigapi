@@ -2,7 +2,6 @@ import fastparquet
 import struct
 from fastparquet import ParquetFile
 from fastparquet.parquet_thrift import FileMetaData
-from icecream import ic
 import copy
 
 def copy_column_ids(src: str, dest: str) -> None:

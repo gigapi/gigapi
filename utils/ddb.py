@@ -8,7 +8,6 @@ from config import settings
 from fsspec.implementations import memory
 import asyncio
 import functools
-from icecream import ic
 
 memfs = memory.MemoryFileSystem()
 

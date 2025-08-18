@@ -6,7 +6,6 @@ from pydantic import BaseModel
 
 from config import settings, postgres_connection_dict
 from services.metadata.ducklake.file_seeker import FileSeeker
-from icecream import ic
 
 mdb = None
 

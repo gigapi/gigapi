@@ -7,7 +7,6 @@ import query_farm_flight_server.flight_inventory as flight_inventory
 from .constants import event_timestamp_column, default_schema_name
 from .flight_descriptor import FlightDescriptorParts, ObjectTypeName
 from .utils import CaseInsensitiveDict
-from icecream import ic
 from enum import Enum
 
 

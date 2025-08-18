@@ -4,7 +4,7 @@ from .model import TableFile, MergePlan
 import duckdb
 import os
 from dataclasses import dataclass
-from icecream import ic
+
 @dataclass
 class MergeConfiguration:
     timeout_s: int
@@ -33,7 +33,6 @@ class FSMerger:
             to_file_path = "'%s'" % os.path.join(
                 self.base, self.database, self.schema, self.table, merge_plan.to_file_path)
             q = f"COPY (SELECT * FROM read_parquet([{",".join(from_files)}])) TO {to_file_path}"
-            ic(q)
             conn.execute(q)
             conn.close()
         finally:

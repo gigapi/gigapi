@@ -45,8 +45,6 @@ from .table import TableInfo, SchemaCollection, DatabaseContents, DatabaseLibrar
 from .database_discovery import discover_databases
 from .bunch_of_parquets import BunchOfParquets
 
-from icecream import ic
-
 log = structlog.get_logger()
 
 

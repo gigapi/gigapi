@@ -6,7 +6,6 @@ import msgpack
 from .model import encode_custom, decode_custom, MetaStore, TableFile, MergePlansByFolder
 from .delete_planner import DeletePlanner
 from .table import TableInfo
-from icecream import ic
 from duckdb import duckdb
 from .merge_planner import MergePlanner
 

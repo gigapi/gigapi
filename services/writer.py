@@ -3,7 +3,6 @@ import json
 from utils.ddb import async_ducklake_connection, memfs, AsyncDuckDBConnection
 import uuid
 from .points import parse_points
-from icecream import ic
 from .reader import lock
 
 async def write_lineproto(data: bytes, database: str):
@@ -54,7 +53,6 @@ async def _write_lineproto(data: bytes, database: str):
                             continue
                         select_part.append(f"\"{field[0]}\"")
                     q = f"INSERT INTO {table_name} ({fields_part}) SELECT {",".join(select_part)} FROM read_json('memory://{filename}')"
-                    ic(q)
                     await conn.aexecute(q)
                 finally:
                     memfs.delete(filename)

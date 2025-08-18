@@ -6,7 +6,6 @@ from pathlib import Path
 from fsspec.implementations.memory import MemoryFileSystem
 from io import BytesIO
 import re
-from icecream import ic
 import mimetypes
 
 router = APIRouter()

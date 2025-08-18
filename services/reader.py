@@ -1,6 +1,5 @@
 from duckdb.duckdb import DuckDBPyRelation
 from utils.ddb import async_ducklake_connection, AsyncDuckDBConnection
-from icecream import ic
 import asyncio
 lock = asyncio.Lock()
 async def query(request: str, database: str = None):
