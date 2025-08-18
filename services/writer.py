@@ -49,7 +49,7 @@ async def prepare_table(conn: AsyncDuckDBConnection, table: str, fields):
             await conn.aexecute(f"CREATE TABLE {table} ({', '.join([f'{field[0]} {field[1]}' 
                 for field in fields if not field[0].startswith("__")])});")
         except Exception as e:
-            if str(e).startswith("Table") and "already exists" in str(e):
+            if "Table" in str(e) and "already exists" in str(e):
                 pass
             else:
                 raise e
