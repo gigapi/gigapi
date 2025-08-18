@@ -4,8 +4,12 @@ from utils.ddb import async_ducklake_connection, memfs, AsyncDuckDBConnection
 import uuid
 from .points import parse_points
 from icecream import ic
+from .reader import lock
 
 async def write_lineproto(data: bytes, database: str):
+    async with lock:
+        await _write_lineproto(data, database)
+async def _write_lineproto(data: bytes, database: str):
     async with async_ducklake_connection(None, True) as conn:
         databases = (await conn.aquery(f"SHOW DATABASES")).fetchall()
         data = parse_points(data)
