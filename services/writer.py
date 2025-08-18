@@ -52,7 +52,8 @@ async def prepare_table(conn: AsyncDuckDBConnection, table: str, fields):
     if [f for f in absent_fields if f[0].startswith("__")]:
         raise ValueError(f"Cannot create table {table} because it contains fields starting with '__'")
     if len(absent_fields) > 0:
-        await conn.aexecute(f"ALTER TABLE {table} ADD ({', '.join([f'{field[0]} {field[1]}' 
-            for field in absent_fields])});")
+        for field in absent_fields:
+            q = f"ALTER TABLE {table} ADD COLUMN {field[0]} {field[1]};"
+            await conn.aexecute(q)
     return existing_fields
 
