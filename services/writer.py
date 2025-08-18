@@ -59,7 +59,7 @@ async def prepare_table(conn: AsyncDuckDBConnection, table: str, fields):
     tables = (await conn.aquery("SHOW TABLES;")).fetchall()
     if tables is None or table not in [row[0] for row in tables]:
         try:
-            await conn.aexecute(f"CREATE TABLE {table} ({', '.join([f'{field[0]} {field[1]}' 
+            await conn.aexecute(f"CREATE TABLE {table} ({', '.join([f'\"{field[0]}\" {field[1]}' 
                 for field in fields if not field[0].startswith("__")])});")
         except Exception as e:
             if "Table" in str(e) and "already exists" in str(e):
@@ -72,7 +72,7 @@ async def prepare_table(conn: AsyncDuckDBConnection, table: str, fields):
         raise ValueError(f"Cannot create table {table} because it contains fields starting with '__'")
     if len(absent_fields) > 0:
         for field in absent_fields:
-            q = f"ALTER TABLE {table} ADD COLUMN {field[0]} {field[1]};"
+            q = f"ALTER TABLE {table} ADD COLUMN \"{field[0]}\" {field[1]};"
             await conn.aexecute(q)
     return existing_fields
 
