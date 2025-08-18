@@ -42,13 +42,13 @@ async def write_lineproto(data: bytes, database: str):
                     fields = (await conn.aquery(f"describe SELECT * FROM read_json('memory://{filename}')")).fetchall()
                     table_fields = await prepare_table(conn, table_name, fields)
                     timestamp_field = [field for field in table_fields if field[0] == "__timestamp"][0]
-                    fields_part = ", ".join([f"{field[0]}" for field in fields])
+                    fields_part = ", ".join([f"\"{field[0]}\"" for field in fields])
                     select_part = []
                     for field in fields:
                         if field[0] == "__timestamp" and timestamp_field[1] == 'TIMESTAMP_NS':
                             select_part.append(f"make_timestamp_ns({field[0]})")
                             continue
-                        select_part.append(f"{field[0]}")
+                        select_part.append(f"\"{field[0]}\"")
                     q = f"INSERT INTO {table_name} ({fields_part}) SELECT {",".join(select_part)} FROM read_json('memory://{filename}')"
                     ic(q)
                     await conn.aexecute(q)
