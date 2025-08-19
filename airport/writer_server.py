@@ -124,7 +124,9 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
 
         # token, database name, schema, table_name
         if os.path.exists(self.base_path):
+            log.info("Discovering existing data...")
             self.contents: DatabaseLibrary = discover_databases(self.base_path)
+            log.info("Existing data discovered.")
         else:
             self.contents: DatabaseLibrary = DatabaseLibrary()
 

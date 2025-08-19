@@ -22,6 +22,9 @@ from .metadata_file_store import MetadataFileStore
 from .table import DatabaseLibrary, DatabaseContents, TableInfo, TableFile, SchemaCollection
 import pyarrow.parquet as pq
 import pyarrow as pa
+import structlog
+
+log = structlog.get_logger()
 
 class DatabaseDiscovery:
     def __init__(self, root):
@@ -59,6 +62,7 @@ class DatabaseDiscovery:
             self.discover_table()
 
     def discover_table(self):
+        log.info("Discovered table", table_name=self.current_table_name)
         table_path = os.path.join(self.root, self.current_database_name, self.current_schema_name, self.current_table_name)
         mdb_path = os.path.join(table_path, "metadata.db")
         if os.path.exists(mdb_path):
