@@ -1,5 +1,6 @@
 import os.path
 import shutil
+from string import Template
 
 import msgpack
 
@@ -11,17 +12,17 @@ from .merge_planner import MergePlanner
 
 
 create_metadata_schema_sql = """
-CREATE TABLE IF NOT EXISTS files (
+CREATE TABLE IF NOT EXISTS $DB.files (
     filename TEXT PRIMARY KEY,
     file BLOB
 );
 
-CREATE TABLE IF NOT EXISTS schema (
+CREATE TABLE IF NOT EXISTS $DB.schema (
     id INT2 PRIMARY KEY,
     schema BLOB
 );
 
-CREATE TABLE IF NOT EXISTS merge_plans
+CREATE TABLE IF NOT EXISTS $DB.merge_plans
 (
     id            TEXT PRIMARY KEY,
     plans         BLOB
@@ -42,7 +43,8 @@ class MetadataFileStore(MetaStore):
         mdb_path = os.path.join(self.base, database, schema, table, "metadata.db")
         self.mdbname = f"{self.database}_{self.schema}_{self.table}"
         conn.execute(f"ATTACH DATABASE '{mdb_path}' AS {self.mdbname}")
-        conn.execute(f"USE {self.mdbname};" + create_metadata_schema_sql)
+        t = Template(create_metadata_schema_sql)
+        conn.execute(t.substitute({"DB": self.mdbname}))
         self.merge_planner = merge_planner
         if self.merge_planner:
             self.merge_planner.on_change = self.on_merge_planner_change
@@ -137,3 +139,8 @@ INSERT INTO {self.mdbname}.merge_plans (id, plans)
 VALUES (2,?)
 ON CONFLICT (id) DO UPDATE SET plans = excluded.plans
 """, [plan_blob])
+
+
+    def detach(self):
+        global conn
+        conn.execute(f"DETACH DATABASE {self.mdbname}")

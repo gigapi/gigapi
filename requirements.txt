@@ -102,3 +102,4 @@ wcwidth==0.2.13
 zstandard==0.23.0
     # via query-farm-flight-server
 line-protocol-parser==1.1.1
+assertpy==1.1

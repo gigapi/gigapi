@@ -7,7 +7,6 @@ load_dotenv()
 import uvicorn
 from fastapi import FastAPI
 from views import reader, writer, middlewares, ui
-from services.merge import run
 import asyncio
 from config import settings
 from threading import Thread

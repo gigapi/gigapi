@@ -306,7 +306,7 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
         if os.path.exists(table_path):
             shutil.rmtree(table_path)
 
-
+        schema.tables_by_name[parameters.name].meta_store.detach()
         del schema.tables_by_name[parameters.name]
         database.version += 1
 

@@ -25,8 +25,7 @@ class AsyncDuckDBConnection:
         return  await loop.run_in_executor(None, functools.partial(self.conn.query, *args, **kwargs))
 
     def close(self):
-        if self.temporary:
-            self.conn.close()
+        self.conn.close()
 
 
 conn: DuckDBPyRelation | None = None
@@ -44,14 +43,14 @@ def connect_duckdb(conn_str: str = None, temporary: bool = False) -> DuckDBPyCon
     return _conn
 
 
-def connect_airport(conn_str: str = None, temporary: bool = False) -> Tuple[AsyncDuckDBConnection, Callable[[], None]]:
+def connect_airport(conn_str: str = None) -> Tuple[AsyncDuckDBConnection, Callable[[], None]]:
     try:
-        if conn is not None and not temporary:
-            aconn = AsyncDuckDBConnection(conn)
+        if conn is not None:
+            aconn = AsyncDuckDBConnection(conn.cursor())
             def cancel():
                 aconn.close()
             return aconn, cancel
-        _conn: DuckDBPyConnection = connect_duckdb(conn_str, temporary)
+        _conn: DuckDBPyConnection = connect_duckdb(conn_str)
         if settings.gigapi.metadata.type == "ducklake":
             # Install the ducklake extension
             _conn.execute("INSTALL airport FROM community;")
@@ -75,7 +74,7 @@ CREATE SECRET airport_testing (type airport, auth_token 'example_token', scope '
         if get_duckdb_thread_limit():
             _conn.execute(f"SET threads TO {get_duckdb_thread_limit()}")
 
-        async_conn = AsyncDuckDBConnection(_conn)
+        async_conn = AsyncDuckDBConnection(_conn.cursor())
 
         # Define cancel function
         def cancel():
@@ -87,9 +86,9 @@ CREATE SECRET airport_testing (type airport, auth_token 'example_token', scope '
         raise Exception(f"Failed to connect to DuckDB/Ducklake: {str(e)}")
 
 @asynccontextmanager
-async def async_ducklake_connection(conn_str: str = None, temporary: bool = False):
+async def async_ducklake_connection(conn_str: str = None):
     loop = asyncio.get_running_loop()
-    async_conn, cancel = await loop.run_in_executor(None, functools.partial(connect_airport, conn_str, temporary))
+    async_conn, cancel = await loop.run_in_executor(None, functools.partial(connect_airport, conn_str))
     try:
         yield async_conn
     finally:

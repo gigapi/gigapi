@@ -3,13 +3,12 @@ import json
 from utils.ddb import async_ducklake_connection, memfs, AsyncDuckDBConnection
 import uuid
 from .points import parse_points
-from .reader import lock
+
 
 async def write_lineproto(data: bytes, database: str):
-    async with lock:
-        await _write_lineproto(data, database)
+    await _write_lineproto(data, database)
 async def _write_lineproto(data: bytes, database: str):
-    async with async_ducklake_connection(None, True) as conn:
+    async with async_ducklake_connection() as conn:
         databases = (await conn.aquery(f"SHOW DATABASES")).fetchall()
         data = parse_points(data)
         json_by_database = {}
@@ -59,6 +58,7 @@ async def _write_lineproto(data: bytes, database: str):
 
 async def prepare_table(conn: AsyncDuckDBConnection, table: str, fields):
     tables = (await conn.aquery("SHOW TABLES;")).fetchall()
+
     if tables is None or table not in [row[0] for row in tables]:
         try:
             await conn.aexecute(f"CREATE TABLE {table} ({', '.join([f'\"{field[0]}\" {field[1]}' 
