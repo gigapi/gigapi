@@ -79,6 +79,7 @@ ON CONFLICT (filename) DO UPDATE SET file = excluded.file""", [file.filename, fi
         global conn
         echema_exists = conn.execute(f"SELECT COUNT(*) FROM {self.mdbname}.schema WHERE id = 1").fetchone()[0] == 1
         if not echema_exists:
+            self.detach()
             return None
         schema = conn.query(f"SELECT schema FROM {self.mdbname}.schema where id = 1").fetchone()
         schema = msgpack.unpackb(schema[0], object_hook=decode_custom)
