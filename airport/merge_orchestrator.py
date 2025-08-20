@@ -54,9 +54,10 @@ class MergeOrchestrator:
                 break
             with ThreadPoolExecutor(max_workers=max_merge_processes) as executor:
                 futures = [executor.submit(self.execute_merge, m) for m in range(len(self.current_merge_plans))]
+                start = time.time()
                 for future in futures:
                     future.result()
-                print(f"Finished {len(futures)} merges")
+                print(f"Finished {len(futures)} merges in {time.time() - start} seconds.")
 
 
     def execute_merge(self, i: int):

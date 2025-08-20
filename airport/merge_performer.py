@@ -19,6 +19,8 @@ configurations = [
     MergeConfiguration(timeout_s=4000, max_result_bytes=4000 * 1024 * 1024, iteration=4),
 ]
 
+merge_conn = duckdb.connect()
+
 class FSMerger:
     def __init__(self, base, database, schema, table):
         self.base = base
@@ -26,7 +28,8 @@ class FSMerger:
         self.schema = schema
         self.table = table
     def do_merge(self, merge_plan: MergePlan):
-        conn = duckdb.connect()
+        global merge_conn
+        conn = merge_conn.cursor()
         try:
             from_files = ["'%s'" % os.path.join(self.base, self.database, self.schema, self.table, file)
                           for file in merge_plan.from_file_paths]
