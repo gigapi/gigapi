@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -22,6 +23,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from airport.writer_server import GigapipeWriterArrowFlightServer
 import signal
 import sys
+from airport.metadata_file_store import MetadataFileStore
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -85,7 +87,45 @@ def main():
     loop.run_until_complete(server.serve())
 
 if __name__ == "__main__":
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-    main()
+    if os.getenv("CMD") == "show_stats":
+        table_path = os.getenv("TABLE_PATH")
+        if not table_path:
+            print("Error: TABLE_PATH environment variable is not set.")
+            sys.exit(1)
+
+        # Split the table_path into its components
+        path_parts = table_path.strip('/').split('/')
+        if len(path_parts) < 4:
+            print("Error: TABLE_PATH should be in the format '/base/path/database/schema/table'")
+            sys.exit(1)
+
+        base_path = '/'.join(path_parts[:-3])
+        database_name = path_parts[-3]
+        schema_name = path_parts[-2]
+        table_name = path_parts[-1]
+
+        # Initialize MetadataFileStore
+        m = MetadataFileStore(
+            base=base_path,
+            database=database_name,
+            schema=schema_name,
+            table=table_name
+        )
+        m.load()
+        print("Table statistics:")
+        print(f"Total files: {len(m.table_info.contents)}")
+        print("Merge plans: ")
+        for folder, merge_plans in m.merge_planner.merge_plans.merge_plans.items():
+            for merge_plan in merge_plans:
+                print(f"  Folder: {folder}")
+                print(f"  State: {merge_plan.state}")
+                print(f"  From files: {len(merge_plan.from_table_files)}")
+                print(f"  To file: {merge_plan.to_file_path}")
+                print(f"  Created at: {merge_plan.created_at}")
+                print(f"  Updated at: {merge_plan.updated_at}")
+                print("  ---")
+    else:
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+        main()
     #test_merge_schema()
