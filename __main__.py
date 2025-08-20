@@ -2,6 +2,8 @@ from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 
+import services.writer
+
 load_dotenv()
 
 import uvicorn
@@ -66,6 +68,7 @@ def signal_handler(signum, frame):
 
 async def start_background_tasks():
     # Start the run function as a background task
+    services.writer.init()
     pass
 
 def run_airport_server():
