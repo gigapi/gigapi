@@ -90,6 +90,7 @@ class MergeOrchestrator:
                 if p is None:
                     break
                 p.state = MergePlanState.PROCESSING
+                p.updated_at = time.time()
                 merge_plans.append(PlanWrapper(planner.base, planner.database, planner.schema, planner.table, p, table))
         return merge_plans
 
