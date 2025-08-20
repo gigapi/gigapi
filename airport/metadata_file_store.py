@@ -1,5 +1,6 @@
 import os.path
 import shutil
+import time
 from string import Template
 
 import msgpack
@@ -30,11 +31,17 @@ CREATE TABLE IF NOT EXISTS $DB.merge_plans
 """
 
 conn = duckdb.connect()
+discovery_stats = {
+    'db_load': 0,
+    'data_load': 0,
+    'merge_load': 0,
+    'delete_load': 0,
+}
 
 class MetadataFileStore(MetaStore):
     def __init__(self, base: str, database: str, schema: str, table: str, table_info: TableInfo = None,
                  merge_planner: MergePlanner = None, delete_planner: DeletePlanner = None):
-        global conn
+        global conn, discovery_stats
         self.base = base
         self.database = database
         self.table = table
@@ -42,7 +49,9 @@ class MetadataFileStore(MetaStore):
         self.schema = schema
         mdb_path = os.path.join(self.base, database, schema, table, "metadata.db")
         self.mdbname = f"{self.database}_{self.schema}_{self.table}"
+        s = time.time()
         conn.execute(f"ATTACH DATABASE '{mdb_path}' AS {self.mdbname}")
+        discovery_stats['db_load'] += time.time() - s
         t = Template(create_metadata_schema_sql)
         conn.execute(t.substitute({"DB": self.mdbname}))
         self.merge_planner = merge_planner
@@ -77,6 +86,7 @@ ON CONFLICT (filename) DO UPDATE SET file = excluded.file""", [file.filename, fi
 
     def load(self):
         global conn
+        s = time.time()
         echema_exists = conn.execute(f"SELECT COUNT(*) FROM {self.mdbname}.schema WHERE id = 1").fetchone()[0] == 1
         if not echema_exists:
             self.detach()
@@ -87,8 +97,12 @@ ON CONFLICT (filename) DO UPDATE SET file = excluded.file""", [file.filename, fi
         for file in conn.query(f"SELECT file FROM {self.mdbname}.files").fetchall():
             f = msgpack.unpackb(file[0], object_hook=decode_custom)
             files.append(f)
+        s1 = time.time()
         self.load_merge_planner(files)
+        discovery_stats['merge_load'] += time.time() - s1
+        s1 = time.time()
         self.load_delete_planner()
+        discovery_stats['delete_load'] += time.time() - s1
         self.table_info = TableInfo(
             table_schema=schema,
             contents=files,
@@ -97,6 +111,7 @@ ON CONFLICT (filename) DO UPDATE SET file = excluded.file""", [file.filename, fi
             merge_planner=self.merge_planner,
             delete_planner=self.delete_planner,
         )
+        discovery_stats['data_load'] += time.time() - s
         return self.table_info
 
     def load_merge_planner(self, files: list[TableFile]):

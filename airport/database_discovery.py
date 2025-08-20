@@ -18,7 +18,7 @@ import time
 
 from .delete_planner import DeletePlanner
 from .merge_planner import MergePlanner
-from .metadata_file_store import MetadataFileStore
+from .metadata_file_store import MetadataFileStore, discovery_stats
 from .table import DatabaseLibrary, DatabaseContents, TableInfo, TableFile, SchemaCollection
 import pyarrow.parquet as pq
 import pyarrow as pa
@@ -44,6 +44,9 @@ class DatabaseDiscovery:
             self.current_database = DatabaseContents()
             self.discover_schemas()
             self.library.databases_by_name[self.current_database_name] = self.current_database
+        log.info("Discovery stats:")
+        for k, v in discovery_stats.items():
+            log.info(f" {k}: {v}s")
 
     def discover_schemas(self):
         database_path = os.path.join(self.root, self.current_database_name)
