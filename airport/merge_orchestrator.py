@@ -2,6 +2,8 @@ import os.path
 import traceback
 from concurrent.futures.thread import ThreadPoolExecutor
 
+import duckdb
+
 from .constants import max_merge_processes
 from .merge_performer import FSMerger
 from .merge_planner import MergePlanner
@@ -30,6 +32,7 @@ class MergeOrchestrator:
         self.start_timer()
         self.last_merge_cleanup = 0
         self.current_merge_plans = []
+        self.conn = None
 
     def start_timer(self):
         if self.timer is None and self.working:
@@ -46,6 +49,14 @@ class MergeOrchestrator:
         self.start_timer()
 
     def merge_iteration(self):
+        self.conn = duckdb.connect()
+        try:
+            self._merge_iteration()
+        finally:
+            self.conn.close()
+            self.conn = None
+
+    def _merge_iteration(self):
         print("Running merge iteration...")
         while True:
             self.current_merge_plans = self.get_merge_plans()
@@ -63,7 +74,7 @@ class MergeOrchestrator:
     def execute_merge(self, i: int):
         try:
             m = self.current_merge_plans[i]
-            fsm = FSMerger(m.base, m.database, m.schema, m.table)
+            fsm = FSMerger(m.base, m.database, m.schema, m.table, self.conn)
             fsm.do_merge(m.merge_plan)
             m.merge_plan.state = MergePlanState.DONE
             to_file_abs = os.path.join(m.base, m.database, m.schema, m.table, m.merge_plan.to_file_path)
