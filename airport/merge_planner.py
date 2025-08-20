@@ -68,8 +68,11 @@ class MergePlanner:
         return None
 
     def cleanup(self):
+        to_delete = []
         for folder in self.merge_plans.merge_plans.keys():
             self.merge_plans.merge_plans[folder] = [merge_plan for merge_plan in self.merge_plans.merge_plans[folder]
                                                     if merge_plan.state!= MergePlanState.DONE]
             if len(self.merge_plans.merge_plans[folder]) == 0:
-                del self.merge_plans.merge_plans[folder]
+                to_delete.append(folder)
+        for folder in to_delete:
+            del self.merge_plans.merge_plans[folder]
