@@ -121,23 +121,27 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
             self.base_path = "data"
 
         # token, database name, schema, table_name
+
         if os.path.exists(self.base_path):
             log.info("Discovering existing data...")
-            self.contents: DatabaseLibrary = discover_databases(self.base_path)
+            contents: DatabaseLibrary = discover_databases(self.base_path)
             log.info("Existing data discovered.")
         else:
-            self.contents: DatabaseLibrary = DatabaseLibrary()
+            contents: DatabaseLibrary = DatabaseLibrary()
 
-        self.merge_orchestrator = MergeOrchestrator()
-        self.delete_orchestrator = DeleteOrchestrator()
-        for schemas in self.contents.databases_by_name.values():
+        merge_orchestrator = MergeOrchestrator()
+        delete_orchestrator = DeleteOrchestrator()
+        for schemas in contents.databases_by_name.values():
             for schema in schemas.schemas_by_name.values():
                 for table_info in schema.tables_by_name.values():
                     if table_info.merge_planner is not None:
-                        self.merge_orchestrator.add_planner(table_info)
-                        self.delete_orchestrator.add_planner(table_info.delete_planner)
+                        merge_orchestrator.add_planner(table_info)
+                        delete_orchestrator.add_planner(table_info.delete_planner)
 
         super().__init__(location=location, **kwargs)
+        self.contents = contents
+        self.merge_orchestrator = merge_orchestrator
+        self.delete_orchestrator = delete_orchestrator
 
 
 
