@@ -84,7 +84,11 @@ class MergeOrchestrator:
     def get_merge_plans(self):
         merge_plans = []
         for table in self.tables:
+            if len(merge_plans) >= 50:
+                break
             while True:
+                if len(merge_plans) >= 50:
+                    break
                 planner = table.merge_planner
                 p = planner.get_merge_plan()
                 if p is None:
