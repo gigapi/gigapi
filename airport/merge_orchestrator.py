@@ -49,6 +49,7 @@ class MergeOrchestrator:
         print("Running merge iteration...")
         while True:
             self.current_merge_plans = self.get_merge_plans()
+            print(f"Got {len(self.current_merge_plans)} merge plans to execute")
             if len(self.current_merge_plans) == 0:
                 break
             with ThreadPoolExecutor(max_workers=max_merge_processes) as executor:
