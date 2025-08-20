@@ -5,6 +5,11 @@ from .constants import max_parquet_size
 from .model import MergePlan, TableFile, MergePlansByFolder, MergePlanState
 from typing import Optional, Callable
 
+class MergePlanWrapper:
+    def __init__(self, merge_plan: MergePlan) -> None:
+        self.merge_plan = merge_plan
+        self.last_update = 0
+
 class MergePlanner:
     def __init__(self, base: str, database: str, schema: str, table: str,
                  merge_plans: Optional[MergePlansByFolder] = None) -> None:
@@ -55,7 +60,10 @@ class MergePlanner:
             for merge_plan in merge_plans:
                 if (merge_plan.state == MergePlanState.IDLE and
                         len(merge_plan.from_table_files) > 1 and
-                        time.time() - merge_plan.created_at > 10):
+                        time.time() - merge_plan.created_at > 10) or (
+                        merge_plan.state == MergePlanState.PROCESSING and
+                        time.time() - merge_plan.updated_at > 1800
+                ):
                     return merge_plan
         return None
 

@@ -163,6 +163,7 @@ class MergePlan:
     iteration: int = 0
     state: MergePlanState = field(default=MergePlanState.IDLE)
     created_at: float = field(default_factory=time.time)
+    updated_at: float = field(default=0)
 
     def __getstate__(self):
         d = asdict(self)

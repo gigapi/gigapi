@@ -79,7 +79,7 @@ class MergeOrchestrator:
             print(f"Error executing merge: {str(e)}")
             print("Exception stack trace:")
             traceback.print_exc()
-            m.state = MergePlanState.IDLE
+            m.merge_plan.state = MergePlanState.IDLE
 
     def get_merge_plans(self):
         merge_plans = []
