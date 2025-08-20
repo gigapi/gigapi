@@ -103,3 +103,4 @@ zstandard==0.23.0
     # via query-farm-flight-server
 line-protocol-parser==1.1.1
 assertpy==1.1
+objgraph==3.6.2

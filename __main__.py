@@ -24,6 +24,8 @@ from airport.writer_server import GigapipeWriterArrowFlightServer
 import signal
 import sys
 from airport.metadata_file_store import MetadataFileStore
+import objgraph
+import time
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -54,7 +56,11 @@ async def general_exception_handler(request, exc):
         content={"detail": "An unexpected error occurred."}
     )
 
-
+async def monitor_object_growth():
+    while True:
+        print("Object growth in the last minute:")
+        objgraph.show_growth(limit=10)
+        await asyncio.sleep(60)  # Wait for 60 seconds
 
 app.add_middleware(middlewares.ErrorHandlerMiddleware)
 
@@ -71,20 +77,22 @@ def signal_handler(signum, frame):
 async def start_background_tasks():
     # Start the run function as a background task
     services.writer.init()
-    pass
+    asyncio.create_task(monitor_object_growth())
 
 def run_airport_server():
     print("START")
     writer_server.run("grpc://127.0.0.1:60001", settings.gigapi.root)
     print("END")
 
+async def run_server():
+    config = uvicorn.Config("__main__:app", host=settings.http.host, port=settings.http.port, loop="asyncio")
+    server = uvicorn.Server(config)
+    await server.serve()
+
 def main():
     t = Thread(target=run_airport_server)
     t.start()
-    loop = asyncio.get_event_loop()
-    config = uvicorn.Config("__main__:app", host=settings.http.host, port=settings.http.port, loop=loop, reload=True)
-    server = uvicorn.Server(config)
-    loop.run_until_complete(server.serve())
+    asyncio.run(run_server())
 
 if __name__ == "__main__":
     if os.getenv("CMD") == "show_stats":
