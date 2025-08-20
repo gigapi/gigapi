@@ -69,7 +69,9 @@ ON CONFLICT (id) DO UPDATE SET schema = excluded.schema
         global conn
         for file in files_added:
             fileb = msgpack.packb(file, default=encode_custom)
-            conn.execute(f"INSERT INTO {self.mdbname}.files (filename, file) VALUES ($1, $2)", [file.filename, fileb])
+            conn.execute(f"""INSERT INTO {self.mdbname}.files (filename, file) 
+VALUES ($1, $2)
+ON CONFLICT (filename) DO UPDATE SET file = excluded.file""", [file.filename, fileb])
         for file in files_removed:
             conn.execute(f"DELETE FROM {self.mdbname}.files WHERE filename = $1", [file.filename])
 
