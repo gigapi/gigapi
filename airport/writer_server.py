@@ -120,8 +120,6 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
         else:
             self.base_path = "data"
 
-        super().__init__(location=location, **kwargs)
-
         # token, database name, schema, table_name
         if os.path.exists(self.base_path):
             log.info("Discovering existing data...")
@@ -138,6 +136,10 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
                     if table_info.merge_planner is not None:
                         self.merge_orchestrator.add_planner(table_info)
                         self.delete_orchestrator.add_planner(table_info.delete_planner)
+
+        super().__init__(location=location, **kwargs)
+
+
 
 
     def action_list_schemas(
