@@ -38,12 +38,11 @@ def connect_duckdb(conn_str: str = None, temporary: bool = False) -> DuckDBPyCon
         return conn
     _conn = duckdb.connect(conn_str)
     _conn.register_filesystem(memfs)
-    if not temporary:
-        conn = _conn
     return _conn
 
 
 def connect_airport(conn_str: str = None) -> Tuple[AsyncDuckDBConnection, Callable[[], None]]:
+    global conn
     try:
         if conn is not None:
             aconn = AsyncDuckDBConnection(conn.cursor())
@@ -73,6 +72,8 @@ CREATE SECRET airport_testing (type airport, auth_token 'example_token', scope '
             _conn.execute(f"SET memory_limit='{get_duckdb_mem_limit()}'")
         if get_duckdb_thread_limit():
             _conn.execute(f"SET threads TO {get_duckdb_thread_limit()}")
+
+        conn = _conn
 
         async_conn = AsyncDuckDBConnection(_conn.cursor())
 
