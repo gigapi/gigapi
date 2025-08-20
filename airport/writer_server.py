@@ -449,8 +449,9 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
         table_files = []
         event_timestamp_min = None
         event_timestamp_max = None
+        file_name = f"{uuid.uuid4()}.parquet"
         with BunchOfParquets(self.base_path, descriptor_parts.catalog_name, descriptor_parts.schema_name,
-                             descriptor_parts.name) as jbop:
+                             descriptor_parts.name, file_name) as jbop:
             for chunk in reader:
                 if chunk.data is None:
                     continue
@@ -482,25 +483,9 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
                     else:
                         # If it's not a TimestampScalar, assume it's a nanosecond timestamp
                         hour_dt = datetime.fromtimestamp(hour.as_py() / 1e9, pytz.UTC)
-                    date_str = hour_dt.strftime("%Y-%m-%d")
-                    hour_str = hour_dt.strftime("%H")
                     mask = pc.equal(hours, hour)
                     hour_chunk = new_rows.filter(mask)
-                    rel_dir = os.path.join(
-                        "data",
-                        f"date={date_str}",
-                        f"hour={hour_str}").strip("/")
-                    output_dir = os.path.join(
-                        self.base_path,
-                        descriptor_parts.catalog_name,
-                        descriptor_parts.schema_name,
-                        descriptor_parts.name,
-                        rel_dir
-                    )
-                    os.makedirs(output_dir, exist_ok=True)
-                    file_name = f"{uuid.uuid4()}.parquet"
-                    rel_path = os.path.join(rel_dir, file_name)
-                    jbop.write_chunk(rel_path, table_info.table_schema, hour_chunk)
+                    jbop.write_chunk(hour_dt, table_info.table_schema, hour_chunk)
                 if return_chunks:
                     writer.write_table(new_rows)
             table_files = [f.table_file for f in jbop.parquet_files.values()]

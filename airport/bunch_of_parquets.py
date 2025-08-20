@@ -1,3 +1,5 @@
+import datetime
+
 import pyarrow.parquet as pq
 import pyarrow as pa
 import os
@@ -19,12 +21,13 @@ class ParquetWrapper:
         self.writer = writer
 
 class BunchOfParquets:
-    def __init__(self, root: str, database: str, schema_name: str, table: str):
+    def __init__(self, root: str, database: str, schema_name: str, table: str, filename: str):
         self.root = root
         self.database = database
         self.schema_name = schema_name
         self.table = table
         self.parquet_files = {}
+        self.filename = filename
 
     def __enter__(self):
         return self
@@ -53,9 +56,11 @@ class BunchOfParquets:
         )
         return self.parquet_files[path]
 
-    def write_chunk(self, path: str, schema: pa.Schema, chunk: any):
+    def write_chunk(self, hour: datetime.datetime, schema: pa.Schema, chunk: any):
         if schema is None:
             raise ValueError("Schema must be provided when creating a new ParquetWriter")
+        path = os.path.join(self.root, self.database, self.schema_name, self.table, "data",
+                            f"date={hour.strftime('%Y-%m-%d')}/hour={hour.strftime('%H')}", self.filename)
         w = self.get_parquet_writer(path, schema)
         w.writer.write_table(chunk)
         min_max = pc.min_max(chunk[event_timestamp_column])
