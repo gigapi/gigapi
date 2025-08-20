@@ -122,6 +122,7 @@ if __name__ == "__main__":
         m.load()
         print("Table statistics:")
         print(f"Total files: {len(m.table_info.contents)}")
+        print(f"Delete plans: {len(m.delete_planner.delete_plans.delete_files)}")
         print("Merge plans: ")
         for folder, merge_plans in m.merge_planner.merge_plans.merge_plans.items():
             for merge_plan in merge_plans:
