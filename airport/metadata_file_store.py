@@ -104,6 +104,9 @@ ON CONFLICT (filename) DO UPDATE SET file = excluded.file""", [file.filename, fi
         merge_plans = conn.query(f"SELECT plans FROM {self.mdbname}.merge_plans WHERE id = 1").fetchone()
         if merge_plans:
             merge_plans = msgpack.unpackb(merge_plans[0], object_hook=decode_custom)
+            for mps in merge_plans.merge_plans.values():
+                for mp in mps:
+                    mp.updated_at = 0
             self.merge_planner = MergePlanner(self.base, self.database, self.schema, self.table, merge_plans)
             self.merge_planner.on_change = self.on_merge_planner_change
         else:
