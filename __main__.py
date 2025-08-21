@@ -1,6 +1,7 @@
 import os
 from contextlib import asynccontextmanager
 
+import duckdb
 from dotenv import load_dotenv
 
 import services.writer
@@ -139,6 +140,9 @@ if __name__ == "__main__":
                 print(f"  Created at: {merge_plan.created_at}")
                 print(f"  Updated at: {merge_plan.updated_at}")
                 print("  ---")
+    elif os.getenv("CMD") == "setup":
+        ddb = duckdb.connect()
+        ddb.execute("INSTALL airport FROM community;")
     else:
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
