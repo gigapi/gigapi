@@ -28,6 +28,7 @@ from airport.metadata_file_store import MetadataFileStore
 import objgraph
 import time
 from services.kvstore import FileStore
+from fastapi.middleware.cors import CORSMiddleware
 
 
 @asynccontextmanager
@@ -64,6 +65,15 @@ async def monitor_object_growth():
         print("Object growth in the last minute:")
         objgraph.show_growth(limit=10)
         await asyncio.sleep(60)  # Wait for 60 seconds
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],  # Allows all methods
+    allow_headers=["Content-Type"],  # Allows all headers
+)
+
 
 app.add_middleware(middlewares.ErrorHandlerMiddleware)
 
