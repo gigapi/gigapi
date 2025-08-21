@@ -9,7 +9,7 @@ load_dotenv()
 
 import uvicorn
 from fastapi import FastAPI
-from views import reader, writer, middlewares, ui
+from views import reader, writer, middlewares, ui, kvstore
 import asyncio
 from config import settings
 from threading import Thread
@@ -26,6 +26,8 @@ import sys
 from airport.metadata_file_store import MetadataFileStore
 import objgraph
 import time
+from services.kvstore import FileStore
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -67,6 +69,7 @@ app.add_middleware(middlewares.ErrorHandlerMiddleware)
 app.include_router(reader.router)
 app.include_router(writer.router)
 app.include_router(ui.router)
+app.include_router(kvstore.router)
 
 shutdown_event = asyncio.Event()
 
@@ -78,6 +81,9 @@ async def start_background_tasks():
     # Start the run function as a background task
     services.writer.init()
     asyncio.create_task(monitor_object_growth())
+    f = FileStore(settings.gigapi.root)
+    kvstore.kv_store = f
+
 
 def run_airport_server():
     print("START")

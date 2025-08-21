@@ -3,11 +3,12 @@ from duckdb import DuckDBPyConnection
 from typing import Dict
 import os
 import json
+import base64
 
 schema = """
 CREATE TABLE IF NOT EXISTS kv(
     key TEXT PRIMARY KEY,
-    value TEXT
+    value BLOB
 );"""
 
 class FileStore:
@@ -24,14 +25,15 @@ class FileStore:
                 self.kv = json.load(f)
             self.conn = duckdb.connect(os.path.join(base_path, "kv.db"))
             self.conn.execute(schema)
-            for k, v in self.kv.items():
+            for k, _v in self.kv.items():
+                v = base64.b64decode(_v)
                 self.set(k, v)
         else:
             self.conn = duckdb.connect(os.path.join(base_path, "kv.db"))
             self.conn.execute(schema)
             self.kv = {}
 
-    def set(self, key: str, value: str):
+    def set(self, key: str, value: bytes):
         conn = self.conn.cursor()
         try:
             self.kv[key] = value
@@ -47,5 +49,5 @@ VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;""", (key
         finally:
             conn.close()
 
-    def get(self, key: str) -> str:
-        return self.kv.get(key, "")
+    def get(self, key: str) -> bytes:
+        return self.kv.get(key, b"")

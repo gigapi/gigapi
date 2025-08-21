@@ -82,8 +82,8 @@ async def query_data(db: Optional[str] = Query(None, description="database to qu
     format_lower = format.lower() if format else "json"
     if format_lower == "json":
         res = await query(query_request.query, database)
-        data = [row async for row in res()]
-        return Response(content=json.dumps(data, cls=CustomJSONEncoder))
+        data = {"results": [row async for row in res()]}
+        return Response(headers={"Content-Type": "application/json"}, content=json.dumps(data, cls=CustomJSONEncoder))
     elif format_lower in ["ndjson", "jsonl"]:
         res = await query(query_request.query, database)
         async def stream_ndjson():
