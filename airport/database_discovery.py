@@ -40,6 +40,8 @@ class DatabaseDiscovery:
 
     def discover(self):
         for database_name in os.listdir(self.root):
+            if not os.path.isdir(os.path.join(self.root, database_name)):
+                continue
             self.current_database_name = database_name
             self.current_database = DatabaseContents()
             self.discover_schemas()

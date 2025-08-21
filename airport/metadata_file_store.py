@@ -1,6 +1,7 @@
 import os.path
 import shutil
 import time
+from contextlib import contextmanager
 from string import Template
 
 import msgpack
@@ -38,10 +39,17 @@ discovery_stats = {
     'delete_load': 0,
 }
 
+@contextmanager
+def cursor():
+    cursor = conn.cursor()
+    try:
+        yield cursor
+    finally:
+        cursor.close()
+
 class MetadataFileStore(MetaStore):
     def __init__(self, base: str, database: str, schema: str, table: str, table_info: TableInfo = None,
                  merge_planner: MergePlanner = None, delete_planner: DeletePlanner = None):
-        global conn, discovery_stats
         self.base = base
         self.database = database
         self.table = table
@@ -50,10 +58,11 @@ class MetadataFileStore(MetaStore):
         mdb_path = os.path.join(self.base, database, schema, table, "metadata.db")
         self.mdbname = f"{self.database}_{self.schema}_{self.table}"
         s = time.time()
-        conn.execute(f"ATTACH DATABASE '{mdb_path}' AS {self.mdbname}")
-        discovery_stats['db_load'] += time.time() - s
-        t = Template(create_metadata_schema_sql)
-        conn.execute(t.substitute({"DB": self.mdbname}))
+        with cursor() as conn:
+            conn.execute(f"ATTACH DATABASE '{mdb_path}' AS {self.mdbname}")
+            discovery_stats['db_load'] += time.time() - s
+            t = Template(create_metadata_schema_sql)
+            conn.execute(t.substitute({"DB": self.mdbname}))
         self.merge_planner = merge_planner
         if self.merge_planner:
             self.merge_planner.on_change = self.on_merge_planner_change
@@ -61,9 +70,10 @@ class MetadataFileStore(MetaStore):
         if self.delete_planner:
             self.delete_planner.on_change = self.on_delete_planner_change
 
-
     def on_schema_update(self):
-        global conn
+        with cursor() as conn:
+            self._on_schema_update(conn)
+    def _on_schema_update(self, conn):
         if self.table_info and self.table_info.table_schema:
             schema_blob = msgpack.packb(self.table_info.table_schema, default=encode_custom)
             conn.execute(f"""
@@ -75,7 +85,10 @@ ON CONFLICT (id) DO UPDATE SET schema = excluded.schema
             print("Warning: Cannot update schema. TableInfo or table_schema is None.")
 
     def on_files_update(self, files_added: list[TableFile], files_removed: list[TableFile]):
-        global conn
+        with cursor() as conn:
+            self._on_files_update(files_added, files_removed, conn)
+
+    def _on_files_update(self, files_added: list[TableFile], files_removed: list[TableFile], conn):
         for file in files_added:
             fileb = msgpack.packb(file, default=encode_custom)
             conn.execute(f"""INSERT INTO {self.mdbname}.files (filename, file) 
@@ -85,7 +98,10 @@ ON CONFLICT (filename) DO UPDATE SET file = excluded.file""", [file.filename, fi
             conn.execute(f"DELETE FROM {self.mdbname}.files WHERE filename = $1", [file.filename])
 
     def load(self):
-        global conn
+        with cursor() as conn:
+            return self._load(conn)
+
+    def _load(self, conn):
         s = time.time()
         echema_exists = conn.execute(f"SELECT COUNT(*) FROM {self.mdbname}.schema WHERE id = 1").fetchone()[0] == 1
         if not echema_exists:
@@ -98,10 +114,10 @@ ON CONFLICT (filename) DO UPDATE SET file = excluded.file""", [file.filename, fi
             f = msgpack.unpackb(file[0], object_hook=decode_custom)
             files.append(f)
         s1 = time.time()
-        self.load_merge_planner(files)
+        self.load_merge_planner(files, conn)
         discovery_stats['merge_load'] += time.time() - s1
         s1 = time.time()
-        self.load_delete_planner()
+        self.load_delete_planner(conn)
         discovery_stats['delete_load'] += time.time() - s1
         self.table_info = TableInfo(
             table_schema=schema,
@@ -114,8 +130,7 @@ ON CONFLICT (filename) DO UPDATE SET file = excluded.file""", [file.filename, fi
         discovery_stats['data_load'] += time.time() - s
         return self.table_info
 
-    def load_merge_planner(self, files: list[TableFile]):
-        global conn
+    def load_merge_planner(self, files: list[TableFile], conn):
         merge_plans = conn.query(f"SELECT plans FROM {self.mdbname}.merge_plans WHERE id = 1").fetchone()
         if merge_plans:
             merge_plans = msgpack.unpackb(merge_plans[0], object_hook=decode_custom)
@@ -131,8 +146,7 @@ ON CONFLICT (filename) DO UPDATE SET file = excluded.file""", [file.filename, fi
             self.merge_planner.on_change = self.on_merge_planner_change
             self.on_merge_planner_change(self.merge_planner)
 
-    def load_delete_planner(self):
-        global conn
+    def load_delete_planner(self, conn):
         delete_plans = conn.query(f"SELECT plans FROM {self.mdbname}.merge_plans WHERE id = 2").fetchone()
         if delete_plans:
             delete_plans = msgpack.unpackb(delete_plans[0], object_hook=decode_custom)
@@ -144,7 +158,10 @@ ON CONFLICT (filename) DO UPDATE SET file = excluded.file""", [file.filename, fi
 
 
     def on_merge_planner_change(self, planner: MergePlanner):
-        global conn
+        with cursor() as conn:
+            self._on_merge_planner_change(planner, conn)
+
+    def _on_merge_planner_change(self, planner: MergePlanner, conn):
         plan_blob = msgpack.packb(planner.merge_plans, default=encode_custom)
         conn.execute(f"""
 INSERT INTO {self.mdbname}.merge_plans (id, plans)
@@ -153,7 +170,10 @@ ON CONFLICT (id) DO UPDATE SET plans = excluded.plans
 """, [plan_blob])
 
     def on_delete_planner_change(self, planner: DeletePlanner):
-        global conn
+        with cursor() as conn:
+            self._on_delete_planner_change(planner, conn)
+
+    def _on_delete_planner_change(self, planner: DeletePlanner, conn):
         plan_blob = msgpack.packb(planner.delete_plans, default=encode_custom)
         conn.execute(f"""
 INSERT INTO {self.mdbname}.merge_plans (id, plans)
@@ -163,5 +183,5 @@ ON CONFLICT (id) DO UPDATE SET plans = excluded.plans
 
 
     def detach(self):
-        global conn
-        conn.execute(f"DETACH DATABASE {self.mdbname}")
+        with cursor as conn:
+            conn.execute(f"DETACH DATABASE {self.mdbname}")
