@@ -143,6 +143,7 @@ if __name__ == "__main__":
     elif os.getenv("CMD") == "setup":
         ddb = duckdb.connect()
         ddb.execute("INSTALL airport FROM community;")
+        ddb.execute("INSTALL httpfs")
     else:
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)

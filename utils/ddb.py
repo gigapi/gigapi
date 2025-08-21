@@ -54,6 +54,8 @@ def connect_airport(conn_str: str = None) -> Tuple[AsyncDuckDBConnection, Callab
             # Install the ducklake extension
             _conn.execute("INSTALL airport FROM community;")
             _conn.execute("LOAD airport")
+            _conn.execute("INSTALL httpfs")
+            _conn.execute("LOAD httpfs")
 
             _conn.execute("""
 CREATE SECRET airport_testing (type airport, auth_token 'example_token', scope 'grpc://localhost:60001/');
