@@ -1,5 +1,6 @@
 import os.path
 import shutil
+import threading
 import time
 from contextlib import contextmanager
 from string import Template
@@ -39,6 +40,8 @@ discovery_stats = {
     'delete_load': 0,
 }
 
+locks = {}
+
 @contextmanager
 def cursor():
     cursor = conn.cursor()
@@ -58,11 +61,12 @@ class MetadataFileStore(MetaStore):
         mdb_path = os.path.join(self.base, database, schema, table, "metadata.db")
         self.mdbname = f"{self.database}_{self.schema}_{self.table}"
         s = time.time()
-        with cursor() as conn:
-            conn.execute(f"ATTACH DATABASE '{mdb_path}' AS {self.mdbname}")
-            discovery_stats['db_load'] += time.time() - s
-            t = Template(create_metadata_schema_sql)
-            conn.execute(t.substitute({"DB": self.mdbname}))
+        with self.get_lock():
+            with cursor() as conn:
+                conn.execute(f"ATTACH DATABASE '{mdb_path}' AS {self.mdbname}")
+                discovery_stats['db_load'] += time.time() - s
+                t = Template(create_metadata_schema_sql)
+                conn.execute(t.substitute({"DB": self.mdbname}))
         self.merge_planner = merge_planner
         if self.merge_planner:
             self.merge_planner.on_change = self.on_merge_planner_change
@@ -70,9 +74,16 @@ class MetadataFileStore(MetaStore):
         if self.delete_planner:
             self.delete_planner.on_change = self.on_delete_planner_change
 
+    def get_lock(self):
+        if self.mdbname not in locks:
+            locks[self.mdbname] = threading.Lock()
+        return locks[self.mdbname]
+
     def on_schema_update(self):
-        with cursor() as conn:
-            self._on_schema_update(conn)
+        with self.get_lock():
+            with cursor() as conn:
+                self._on_schema_update(conn)
+
     def _on_schema_update(self, conn):
         if self.table_info and self.table_info.table_schema:
             schema_blob = msgpack.packb(self.table_info.table_schema, default=encode_custom)
@@ -85,8 +96,9 @@ ON CONFLICT (id) DO UPDATE SET schema = excluded.schema
             print("Warning: Cannot update schema. TableInfo or table_schema is None.")
 
     def on_files_update(self, files_added: list[TableFile], files_removed: list[TableFile]):
-        with cursor() as conn:
-            self._on_files_update(files_added, files_removed, conn)
+        with self.get_lock():
+            with cursor() as conn:
+                self._on_files_update(files_added, files_removed, conn)
 
     def _on_files_update(self, files_added: list[TableFile], files_removed: list[TableFile], conn):
         for file in files_added:
@@ -98,8 +110,9 @@ ON CONFLICT (filename) DO UPDATE SET file = excluded.file""", [file.filename, fi
             conn.execute(f"DELETE FROM {self.mdbname}.files WHERE filename = $1", [file.filename])
 
     def load(self):
-        with cursor() as conn:
-            return self._load(conn)
+        with self.get_lock():
+            with cursor() as conn:
+                return self._load(conn)
 
     def _load(self, conn):
         s = time.time()
@@ -170,8 +183,9 @@ ON CONFLICT (id) DO UPDATE SET plans = excluded.plans
 """, [plan_blob])
 
     def on_delete_planner_change(self, planner: DeletePlanner):
-        with cursor() as conn:
-            self._on_delete_planner_change(planner, conn)
+        with self.get_lock():
+            with cursor() as conn:
+                self._on_delete_planner_change(planner, conn)
 
     def _on_delete_planner_change(self, planner: DeletePlanner, conn):
         plan_blob = msgpack.packb(planner.delete_plans, default=encode_custom)
@@ -183,5 +197,7 @@ ON CONFLICT (id) DO UPDATE SET plans = excluded.plans
 
 
     def detach(self):
-        with cursor as conn:
+        with cursor() as conn:
             conn.execute(f"DETACH DATABASE {self.mdbname}")
+        if self.mdbname in locks:
+            del locks[self.mdbname]

@@ -1,6 +1,6 @@
 import zipfile
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, RedirectResponse
 from starlette.staticfiles import StaticFiles
 from pathlib import Path
 from fsspec.implementations.memory import MemoryFileSystem
@@ -44,9 +44,13 @@ with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                     media_type = get_media_type(file_path)
                     return Response(content=content, media_type=media_type)
 
-# Special case for the root path
-@router.get("/", response_class=Response)
-@router.get("/ui", response_class=Response)
+# Replace the existing root path handlers with this:
+@router.get("/", response_class=RedirectResponse)
+@router.get("/ui", response_class=RedirectResponse)
+async def redirect_root():
+    return RedirectResponse(url="/ui/", status_code=307)
+
+@router.get("/ui/", response_class=Response)
 @router.get("/ui/{path:path}", response_class=Response)
 async def read_root():
     if memfs.exists("index.html"):

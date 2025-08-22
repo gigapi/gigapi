@@ -23,6 +23,7 @@ from .table import DatabaseLibrary, DatabaseContents, TableInfo, TableFile, Sche
 import pyarrow.parquet as pq
 import pyarrow as pa
 import structlog
+import shutil
 
 log = structlog.get_logger()
 
@@ -43,12 +44,58 @@ class DatabaseDiscovery:
             if not os.path.isdir(os.path.join(self.root, database_name)):
                 continue
             self.current_database_name = database_name
+            if self.check_if_old():
+                self.migrate_old()
             self.current_database = DatabaseContents()
             self.discover_schemas()
             self.library.databases_by_name[self.current_database_name] = self.current_database
         log.info("Discovery stats:")
         for k, v in discovery_stats.items():
             log.info(f" {k}: {v}s")
+
+    def check_if_old(self):
+        base_path = os.path.join(self.root, self.current_database_name)
+
+        if not os.path.isdir(base_path):
+            return False
+
+        for table_name in os.listdir(base_path):
+            table_path = os.path.join(base_path, table_name)
+
+            data_path = os.path.join(table_path, "data")
+            if not os.path.isdir(data_path):
+                return False
+
+            for item in os.listdir(data_path):
+                date_path = os.path.join(data_path, item)
+                if os.path.isdir(date_path) and not item.startswith("date="):
+                    return False
+
+        return True
+
+    def migrate_old(self):
+        base_path = os.path.join(self.root, self.current_database_name)
+        master_path = os.path.join(base_path, "master")
+
+        # Create the master directory if it doesn't exist
+        os.makedirs(master_path, exist_ok=True)
+
+        # Get all items in the base directory
+        items = os.listdir(base_path)
+
+        for item in items:
+            item_path = os.path.join(base_path, item)
+
+            # Skip if it's not a directory or if it's the master directory
+            if not os.path.isdir(item_path) or item == "master":
+                continue
+
+            # Move the directory to the master folder
+            destination_path = os.path.join(master_path, item)
+            shutil.move(item_path, destination_path)
+
+        log.info(f"Migrated old structure for database: {self.current_database_name}")
+
 
     def discover_schemas(self):
         database_path = os.path.join(self.root, self.current_database_name)

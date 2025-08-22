@@ -18,7 +18,8 @@ async def query(session, db, query):
         print(f"Content-Type: {content_type}")
 
         if 'application/json' in content_type:
-            return await response.json()
+            res = await response.json()
+            return res['results'] if 'results' in res else res
         else:
             return await response.text()
 
