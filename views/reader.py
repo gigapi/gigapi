@@ -87,8 +87,14 @@ async def query_data(db: Optional[str] = Query(None, description="database to qu
     elif format_lower in ["ndjson", "jsonl"]:
         res = await query(query_request.query, database)
         async def stream_ndjson():
+            buff = []
             async for row in res():
-                yield custom_json_dumps(row) + "\n"
+                buff.append(custom_json_dumps(row))
+                if len(buff) > 1000:
+                    yield "\n".join(buff)+"\n"
+                    buff = []
+            if len(buff) > 0:
+                yield "\n".join(buff)+"\n"
         return StreamingResponse(stream_ndjson(), media_type="application/x-ndjson")
     elif format_lower == "csv":
         res = await query(query_request.query, database)
