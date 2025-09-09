@@ -56,11 +56,11 @@ services:
 | `GIGAPI_METADATA_URL`      | Metadata Type URL for redis (ie: `redis://redis:6379/0`             |               | 🟠          |
 | `HTTP_PORT`                | Port to listen on for HTTP server                                   | `7971`        | 🟢          |
 | `HTTP_HOST`                | Host to bind to for HTTP server                                     | `"0.0.0.0"`   | 🟢          |
-| `HTTP_BASIC_AUTH_USERNAME` | Username for HTTP basic authentication                              |               | 🟠          |
-| `HTTP_BASIC_AUTH_PASSWORD` | Password for HTTP basic authentication                              |               | 🟠          |
-| `FLIGHTSQL_PORT`           | Port to run FlightSQL server                                        | `8082`        | 🟠          |
-| `FLIGHTSQL_ENABLE`         | Enable FlightSQL server                                             | `true`        | 🟠          |
-| `LOGLEVEL`                 | Log level (debug, info, warn, error, fatal)                         | `"info"`      | 🟠          |
+| `HTTP_BASIC_AUTH_USERNAME` | Username for HTTP basic authentication                              |               | 🟢          |
+| `HTTP_BASIC_AUTH_PASSWORD` | Password for HTTP basic authentication                              |               | 🟢          |
+| `FLIGHTSQL_PORT`           | Port to run FlightSQL server                                        | `8082`        | 🟢          |
+| `FLIGHTSQL_ENABLE`         | Enable FlightSQL server                                             | `true`        | 🟢          |
+| `LOGLEVEL`                 | Log level (debug, info, warn, error, fatal)                         | `"info"`      | 🟢          |
 | `GIGAPI_LAYER_X_NAME`      | X - layer index from 0. Layer unique name.                          |               | 🟠          |
 | `GIGAPI_LAYER_X_TYPE`      | `fs` for file system, `s3` for s3                                   |               | 🟠          |
 | `GIGAPI_LAYER_X_GLOBAL`    | `true` if all the cluster has an access to the layer                |               | 🟠          |
