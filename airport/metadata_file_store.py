@@ -6,12 +6,15 @@ from contextlib import contextmanager
 from string import Template
 
 import msgpack
+import structlog
 
 from .model import encode_custom, decode_custom, MetaStore, TableFile, MergePlansByFolder
 from .delete_planner import DeletePlanner
 from .table import TableInfo
 from duckdb import duckdb
 from .merge_planner import MergePlanner
+
+log = structlog.get_logger()
 
 
 create_metadata_schema_sql = """
@@ -93,7 +96,10 @@ VALUES (1, ?)
 ON CONFLICT (id) DO UPDATE SET schema = excluded.schema
 """, [schema_blob])
         else:
-            print("Warning: Cannot update schema. TableInfo or table_schema is None.")
+            log.warning("Cannot update schema. TableInfo or table_schema is None.",
+                        database=self.database,
+                        schema=self.schema,
+                        table=self.table)
 
     def on_files_update(self, files_added: list[TableFile], files_removed: list[TableFile]):
         with self.get_lock():

@@ -47,22 +47,25 @@ services:
 
 | Env Var Name               | Description                                                         | Default Value | In progress |
 |----------------------------|---------------------------------------------------------------------|---------------|-------------|
-| `GIGAPI_ROOT`              | Root folder for all the data files                                  |               | 🟢        |
-| `GIGAPI_MERGE_TIMEOUT_S`   | Base timeout between merges (in seconds)                            | `10`          | 🟠 |
-| `GIGAPI_NO_MERGES`         | Disable merging                                                     | `false`       | 🟢        |
-| `GIGAPI_UI`                | Enable UI for querier                                               | `true`        | 🟢        |
-| `GIGAPI_MODE`              | Execution mode (`readonly`, `writeonly`, `compaction`, `aio`)       | `"aio"`       | 🟠 |
-| `GIGAPI_METADATA_TYPE`     | Metadata Type (`local` for local, `redis` for distributed)          | `"local"`     | 🟠 | 
-| `GIGAPI_METADATA_URL`      | Metadata Type URL for redis (ie: `redis://redis:6379/0`             |               | 🟠 |
-| `HTTP_PORT`                | Port to listen on for HTTP server                                   | `7971`        | 🟢        |
-| `HTTP_HOST`                | Host to bind to for HTTP server                                     | `"0.0.0.0"`   | 🟢        |
-| `HTTP_BASIC_AUTH_USERNAME` | Username for HTTP basic authentication                              |               | 🟠   |
-| `HTTP_BASIC_AUTH_PASSWORD` | Password for HTTP basic authentication                              |               | 🟠   |
-| `GIGAPI_LAYER_X_NAME`      | X - layer index from 0. Layer unique name.                          |               | 🟠 |
-| `GIGAPI_LAYER_X_TYPE`      | `fs` for file system, `s3` for s3                                   |               | 🟠 |
-| `GIGAPI_LAYER_X_GLOBAL`    | `true` if all the cluster has an access to the layer                |               | 🟠 |
-| `GIGAPI_LAYER_X_URL`       | path or url to s3                                                   |               | 🟠 |
-| `GIGAPI_LAYER_X_TTL`       | timeout before send data to the next layer or drop it 0 for no drop | `0`           | 🟠 |
+| `GIGAPI_ROOT`              | Root folder for all the data files                                  |               | 🟢          |
+| `GIGAPI_MERGE_TIMEOUT_S`   | Base timeout between merges (in seconds)                            | `10`          | 🟠          |
+| `GIGAPI_NO_MERGES`         | Disable merging                                                     | `false`       | 🟢          |
+| `GIGAPI_UI`                | Enable UI for querier                                               | `true`        | 🟢          |
+| `GIGAPI_MODE`              | Execution mode (`readonly`, `writeonly`, `compaction`, `aio`)       | `"aio"`       | 🟠          |
+| `GIGAPI_METADATA_TYPE`     | Metadata Type (`local` for local, `redis` for distributed)          | `"local"`     | 🟠          | 
+| `GIGAPI_METADATA_URL`      | Metadata Type URL for redis (ie: `redis://redis:6379/0`             |               | 🟠          |
+| `HTTP_PORT`                | Port to listen on for HTTP server                                   | `7971`        | 🟢          |
+| `HTTP_HOST`                | Host to bind to for HTTP server                                     | `"0.0.0.0"`   | 🟢          |
+| `HTTP_BASIC_AUTH_USERNAME` | Username for HTTP basic authentication                              |               | 🟠          |
+| `HTTP_BASIC_AUTH_PASSWORD` | Password for HTTP basic authentication                              |               | 🟠          |
+| `FLIGHTSQL_PORT`           | Port to run FlightSQL server                                        | `8082`        | 🟠          |
+| `FLIGHTSQL_ENABLE`         | Enable FlightSQL server                                             | `true`        | 🟠          |
+| `LOGLEVEL`                 | Log level (debug, info, warn, error, fatal)                         | `"info"`      | 🟠          |
+| `GIGAPI_LAYER_X_NAME`      | X - layer index from 0. Layer unique name.                          |               | 🟠          |
+| `GIGAPI_LAYER_X_TYPE`      | `fs` for file system, `s3` for s3                                   |               | 🟠          |
+| `GIGAPI_LAYER_X_GLOBAL`    | `true` if all the cluster has an access to the layer                |               | 🟠          |
+| `GIGAPI_LAYER_X_URL`       | path or url to s3                                                   |               | 🟠          |
+| `GIGAPI_LAYER_X_TTL`       | timeout before send data to the next layer or drop it 0 for no drop | `0`           | 🟠          |
 
 > You can override the defaults by setting these environment variables before starting the service.
 

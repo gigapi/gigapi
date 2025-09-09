@@ -18,7 +18,7 @@ from airport import writer_server
 from airport import database_discovery
 from icecream import ic
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from airport.writer_server import GigapipeWriterArrowFlightServer
@@ -29,6 +29,26 @@ import objgraph
 import time
 from services.kvstore import FileStore
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi import Depends, HTTPException, status
+from config import settings
+import logging
+
+def get_log_level():
+    loglevels = {
+        "debug": logging.DEBUG,
+        "info": logging.INFO,
+        "warn": logging.WARN,
+        "error": logging.ERROR,
+        "fatal": logging.FATAL
+    }
+    if settings.loglevel.lower() in loglevels:
+        return loglevels[settings.loglevel.lower()]
+    logging.error(f"Invalid log level: {settings.loglevel}. Using default log level: info")
+    return logging.INFO
+
+logging.basicConfig(level=get_log_level())
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -37,13 +57,44 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(start_background_tasks())
     yield
 
-app = FastAPI(lifespan=lifespan)
+security = HTTPBasic(auto_error=False)
+
+class UnauthorizedException(HTTPException):
+    pass
+
+def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)):
+    correct_username = settings.http.basic_auth.username.strip()
+    correct_password = settings.http.basic_auth.password.strip()
+    if credentials is None or not (credentials.username == correct_username and credentials.password == correct_password):
+        raise UnauthorizedException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Basic realm=\"Access to the API\""},
+        )
+    return credentials.username
+
+def get_app_dependencies():
+    deps = []
+    if settings.http.basic_auth is not None and \
+            settings.http.basic_auth.username is not None and \
+            settings.http.basic_auth.username != "":
+        deps.append(Depends(verify_credentials))
+    return deps
+
+app = FastAPI(lifespan=lifespan, dependencies=get_app_dependencies())
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc):
     return JSONResponse(
         status_code=422,
         content={"detail": exc.errors(), "body": exc.body}
+    )
+
+@app.exception_handler(UnauthorizedException)
+async def http_exception_handler(request, exc):
+    return Response(
+        status_code=exc.status_code,
+        headers={"WWW-Authenticate": "Basic realm=\"Access to the API\""},
     )
 
 @app.exception_handler(StarletteHTTPException)
@@ -61,8 +112,10 @@ async def general_exception_handler(request, exc):
     )
 
 async def monitor_object_growth():
+    if get_log_level() > logging.DEBUG:
+        return
     while True:
-        print("Object growth in the last minute:")
+        logger.debug("Object growth in the last minute:")
         objgraph.show_growth(limit=10)
         await asyncio.sleep(60)  # Wait for 60 seconds
 
@@ -74,7 +127,6 @@ app.add_middleware(
     allow_headers=["Content-Type"],  # Allows all headers
 )
 
-
 app.add_middleware(middlewares.ErrorHandlerMiddleware)
 
 app.include_router(reader.router)
@@ -85,7 +137,7 @@ app.include_router(kvstore.router)
 shutdown_event = asyncio.Event()
 
 def signal_handler(signum, frame):
-    print("Received shutdown signal")
+    logger.info("Received shutdown signal")
     writer_server.shutdown()
 
 async def start_background_tasks():
@@ -97,9 +149,10 @@ async def start_background_tasks():
 
 
 def run_airport_server():
-    print("START")
-    writer_server.run("grpc://127.0.0.1:60001", settings.gigapi.root)
-    print("END")
+    logger.info("Airport server start")
+    server_host = "127.0.0.1" if not settings.flightsql.enable else "0.0.0.0"
+    writer_server.run(f"grpc://{server_host}:{settings.flightsql.port}", settings.gigapi.root)
+    logger.info("Airport server stop")
 
 async def run_server():
     config = uvicorn.Config("__main__:app", host=settings.http.host, port=settings.http.port, loop="asyncio")
@@ -115,13 +168,13 @@ if __name__ == "__main__":
     if os.getenv("CMD") == "show_stats":
         table_path = os.getenv("TABLE_PATH")
         if not table_path:
-            print("Error: TABLE_PATH environment variable is not set.")
+            logger.error("Error: TABLE_PATH environment variable is not set.")
             sys.exit(1)
 
         # Split the table_path into its components
         path_parts = table_path.strip('/').split('/')
         if len(path_parts) < 4:
-            print("Error: TABLE_PATH should be in the format '/base/path/database/schema/table'")
+            logger.error("Error: TABLE_PATH should be in the format '/base/path/database/schema/table'")
             sys.exit(1)
 
         base_path = '/'.join(path_parts[:-3])
@@ -137,19 +190,19 @@ if __name__ == "__main__":
             table=table_name
         )
         m.load()
-        print("Table statistics:")
-        print(f"Total files: {len(m.table_info.contents)}")
-        print(f"Delete plans: {len(m.delete_planner.delete_plans.delete_files)}")
-        print("Merge plans: ")
+        logger.info("Table statistics:")
+        logger.info(f"Total files: {len(m.table_info.contents)}")
+        logger.info(f"Delete plans: {len(m.delete_planner.delete_plans.delete_files)}")
+        logger.info("Merge plans: ")
         for folder, merge_plans in m.merge_planner.merge_plans.merge_plans.items():
             for merge_plan in merge_plans:
-                print(f"  Folder: {folder}")
-                print(f"  State: {merge_plan.state}")
-                print(f"  From files: {len(merge_plan.from_table_files)}")
-                print(f"  To file: {merge_plan.to_file_path}")
-                print(f"  Created at: {merge_plan.created_at}")
-                print(f"  Updated at: {merge_plan.updated_at}")
-                print("  ---")
+                logger.info(f"  Folder: {folder}")
+                logger.info(f"  State: {merge_plan.state}")
+                logger.info(f"  From files: {len(merge_plan.from_table_files)}")
+                logger.info(f"  To file: {merge_plan.to_file_path}")
+                logger.info(f"  Created at: {merge_plan.created_at}")
+                logger.info(f"  Updated at: {merge_plan.updated_at}")
+                logger.info("  ---")
     elif os.getenv("CMD") == "setup":
         ddb = duckdb.connect()
         ddb.execute("INSTALL airport FROM community;")

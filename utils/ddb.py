@@ -41,6 +41,11 @@ def connect_duckdb(conn_str: str = None, temporary: bool = False) -> DuckDBPyCon
     return _conn
 
 
+def get_airport_host() -> str:
+    host = "127.0.0.1"
+    port = settings.flightsql.port
+    return f"grpc://{host}:{port}"
+
 def connect_airport(conn_str: str = None) -> Tuple[AsyncDuckDBConnection, Callable[[], None]]:
     global conn
     try:
@@ -50,6 +55,7 @@ def connect_airport(conn_str: str = None) -> Tuple[AsyncDuckDBConnection, Callab
                 aconn.close()
             return aconn, cancel
         _conn: DuckDBPyConnection = connect_duckdb(conn_str)
+        airport_host = get_airport_host()
         if settings.gigapi.metadata.type == "ducklake":
             # Install the ducklake extension
             _conn.execute("INSTALL airport FROM community;")
@@ -57,18 +63,18 @@ def connect_airport(conn_str: str = None) -> Tuple[AsyncDuckDBConnection, Callab
             _conn.execute("INSTALL httpfs")
             _conn.execute("LOAD httpfs")
 
-            _conn.execute("""
-CREATE SECRET airport_testing (type airport, auth_token 'example_token', scope 'grpc://localhost:60001/');
+            _conn.execute(f"""
+CREATE SECRET airport_testing (type airport, auth_token 'example_token', scope '{airport_host}');
 """)
-            query_result: DuckDBPyRelation = _conn.query("SELECT name from airport_databases('grpc://localhost:60001/')")
+            query_result: DuckDBPyRelation = _conn.query(f"SELECT name from airport_databases('{airport_host}')")
             databases = query_result.fetchall()
             if len(databases) == 0:
-                _conn.execute("CALL airport_action('grpc://localhost:60001/', 'create_database', 'my_airport');")
-                _conn.execute("ATTACH 'my_airport' (TYPE  AIRPORT, location 'grpc://localhost:60001/')")
+                _conn.execute(f"CALL airport_action('{airport_host}', 'create_database', 'my_airport');")
+                _conn.execute(f"ATTACH 'my_airport' (TYPE  AIRPORT, location '{airport_host}')")
                 _conn.execute(f"CREATE SCHEMA my_airport.master;")
             else:
                 for d in databases:
-                    _conn.execute(f"ATTACH '{d[0]}' (TYPE  AIRPORT, location 'grpc://localhost:60001/')")
+                    _conn.execute(f"ATTACH '{d[0]}' (TYPE  AIRPORT, location '{airport_host}')")
 
         if get_duckdb_mem_limit():
             _conn.execute(f"SET memory_limit='{get_duckdb_mem_limit()}'")

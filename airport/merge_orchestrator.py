@@ -3,6 +3,7 @@ import traceback
 from concurrent.futures.thread import ThreadPoolExecutor
 
 import duckdb
+import structlog
 
 from .constants import max_merge_processes
 from .merge_performer import FSMerger
@@ -13,6 +14,8 @@ import threading
 import time
 
 from .table import TableInfo
+
+log = structlog.get_logger()
 
 
 class PlanWrapper:
@@ -57,10 +60,10 @@ class MergeOrchestrator:
             self.conn = None
 
     def _merge_iteration(self):
-        print("Running merge iteration...")
+        log.info("Running merge iteration")
         while True:
             self.current_merge_plans = self.get_merge_plans()
-            print(f"Got {len(self.current_merge_plans)} merge plans to execute")
+            log.info("Got merge plans to execute", count=len(self.current_merge_plans))
             if len(self.current_merge_plans) == 0:
                 break
             with ThreadPoolExecutor(max_workers=max_merge_processes) as executor:
@@ -68,8 +71,7 @@ class MergeOrchestrator:
                 start = time.time()
                 for future in futures:
                     future.result()
-                print(f"Finished {len(futures)} merges in {time.time() - start} seconds.")
-
+                log.info("Finished merges", count=len(futures), duration=time.time() - start)
 
     def execute_merge(self, i: int):
         try:
@@ -81,7 +83,7 @@ class MergeOrchestrator:
             event_timestamp_min = pc.min([f.event_timestamp_min for f in m.merge_plan.from_table_files])
             event_timestamp_max = pc.max([f.event_timestamp_max for f in m.merge_plan.from_table_files])
             add_file = TableFile(
-                # TODO: fix the absolute pahts
+                # TODO: fix the absolute paths
                 filename=m.merge_plan.to_file_path,
                 event_timestamp_min=event_timestamp_min,
                 event_timestamp_max=event_timestamp_max,
@@ -89,9 +91,10 @@ class MergeOrchestrator:
             )
             m.table_info.alter_table_files([add_file], m.merge_plan.from_table_files)
         except Exception as e:
-            print(f"Error executing merge: {str(e)}")
-            print("Exception stack trace:")
-            traceback.print_exc()
+            log.error("Error executing merge",
+                      error=str(e),
+                      traceback=traceback.format_exc(),
+                      merge_plan=m.merge_plan)
             m.merge_plan.state = MergePlanState.IDLE
 
     def get_merge_plans(self):

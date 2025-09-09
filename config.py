@@ -1,3 +1,5 @@
+import os
+
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional, List
@@ -10,13 +12,21 @@ class MetadataConfiguration(BaseSettings):
         env_nested_delimiter = ""
         extra = "allow"
 
-class BasicAuthConfiguration(BaseModel):
+class BasicAuthConfiguration(BaseSettings):
     username: str = Field("", description="Username for basic authentication")
     password: str = Field("", description="Password for basic authentication")
+    class Config:
+        env_prefix = "HTTP_BASIC_AUTH_"
+        env_nested_delimiter = ""
+        extra = "allow"
 
-class FlightSqlConfiguration(BaseModel):
+class FlightSqlConfiguration(BaseSettings):
     port: int = Field(8082, description="Port to run flightSQL server")
     enable: bool = Field(True, description="Enable FlightSQL server")
+    class Config:
+        env_prefix = "FLIGHTSQL_"
+        env_nested_delimiter = ""
+        extra = "allow"
 
 class HTTPConfiguration(BaseSettings):
     port: int = Field(7971, description="Port to listen on")
@@ -52,6 +62,8 @@ class Settings(BaseSettings):
 settings = Settings()
 settings.gigapi = GigapiConfiguration()
 settings.http = HTTPConfiguration()
+settings.flightsql = FlightSqlConfiguration()
+#settings.http.basic_auth = basic_auth
 settings.gigapi.metadata = MetadataConfiguration()
 
 def postgres_connection_dict():

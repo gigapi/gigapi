@@ -44,7 +44,24 @@ from .model import TableFile
 from .table import TableInfo, SchemaCollection, DatabaseContents, DatabaseLibrary
 from .database_discovery import discover_databases
 from .bunch_of_parquets import BunchOfParquets
+from structlog._log_levels import NAME_TO_LEVEL
 
+
+loglevel = os.getenv("LOGLEVEL")
+loglevel = "info" if loglevel is None else loglevel
+loglevel = "critical" if loglevel == "fatal" else loglevel
+
+def filter_by_level(logger, method_name, event_dict):
+    if NAME_TO_LEVEL[method_name] > NAME_TO_LEVEL[loglevel]:
+        return event_dict
+    raise structlog.DropEvent
+
+def get_structlog_conf():
+    cfg = structlog.get_config()
+    cfg["processors"].append(filter_by_level)
+    return cfg
+
+structlog.configure(**get_structlog_conf())
 log = structlog.get_logger()
 
 

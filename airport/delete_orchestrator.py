@@ -1,8 +1,12 @@
 import threading
+import structlog
+import traceback
+
 
 from .delete_performer import FSDeletePerformer
 from .delete_planner import DeletePlanner
 
+log = structlog.get_logger()
 
 class DeleteOrchestrator:
     def __init__(self):
@@ -20,7 +24,7 @@ class DeleteOrchestrator:
             self.timer.start()
 
     def run_delete_iteration(self):
-        print("Running delete iteration...")
+        log.info("Running delete iteration")
         self.timer = None
         deleted = 0
         for planner in self.planners:
@@ -32,10 +36,13 @@ class DeleteOrchestrator:
                     planner.remove_delete_plan(delete_plan.file_path)
                     deleted += 1
                 except Exception as e:
-                    print(f"Error executing delete: {str(e)}")
+                    log.error("Error executing delete",
+                              error=str(e),
+                              traceback=traceback.format_exc(),
+                              file_path=delete_plan.file_path)
                     break
                 delete_plan = planner.get_delete_plan()
-        print(f"Deleted {deleted} files")
+        log.info("Delete iteration completed", deleted_files=deleted)
         self.start_timer()
 
     def stop(self):

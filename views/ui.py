@@ -35,7 +35,6 @@ with zipfile.ZipFile(zip_path, 'r') as zip_ref:
 
                 # Create a route for this file
                 file_path = "/" + serve_filename.lstrip("/")
-                print(f"Created route for {file_path}")
 
                 @router.get("/ui" + file_path, response_class=Response)
                 @router.get(file_path, response_class=Response)

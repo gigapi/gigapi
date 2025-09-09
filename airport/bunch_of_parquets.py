@@ -3,15 +3,15 @@ import datetime
 import pyarrow.parquet as pq
 import pyarrow as pa
 import os
-
-import pyarrow.parquet as pq
-import pyarrow as pa
-import os
-from typing import Optional
 import pyarrow.compute as pc
 
 from .constants import event_timestamp_column
 from .model import TableFile
+import structlog
+import sys
+import traceback
+
+log = structlog.get_logger()
 
 
 class ParquetWrapper:
@@ -76,6 +76,13 @@ class BunchOfParquets:
             try:
                 writer.writer.close()
             except Exception as e:
-                print(f"Error closing ParquetWriter for {path}: {str(e)}")
+                exc_info = sys.exc_info()
+                log.info(
+                    "Error closing ParquetWriter",
+                    path=path,
+                    error=str(e),
+                    exc_info=exc_info,
+                    traceback=traceback.format_exception(*exc_info)
+                )
 
         self.parquet_files.clear()

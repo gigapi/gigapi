@@ -1,7 +1,7 @@
 import json
 import asyncio
 from typing import List, Dict
-from utils.ddb import async_ducklake_connection, memfs, AsyncDuckDBConnection
+from utils.ddb import async_ducklake_connection, memfs, AsyncDuckDBConnection, get_airport_host
 import uuid
 from .points import parse_points
 import structlog
@@ -55,12 +55,13 @@ class Buffer:
     async def _write_to_airport(self, data_by_table: Dict[str, Dict[str, List[Dict]]]):
         if len(data_by_table) == 0:
             return
+        airport_host = get_airport_host()
         async with async_ducklake_connection() as conn:
             databases = (await conn.aquery(f"SHOW DATABASES")).fetchall()
             for database, tables in data_by_table.items():
                 if database not in [row[0] for row in databases]:
-                    await conn.aexecute(f"CALL airport_action('grpc://localhost:60001/', 'create_database', '{database}');")
-                    await conn.aexecute(f"ATTACH '{database}' (TYPE  AIRPORT, location 'grpc://localhost:60001/')")
+                    await conn.aexecute(f"CALL airport_action('{airport_host}', 'create_database', '{database}');")
+                    await conn.aexecute(f"ATTACH '{database}' (TYPE  AIRPORT, location '{airport_host}')")
                     await conn.aexecute(f"CREATE SCHEMA {database}.master;")
                 await conn.aexecute(f"USE {database}.master;")
                 for table, points in tables.items():

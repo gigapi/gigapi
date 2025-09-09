@@ -24,11 +24,13 @@ import pyarrow.parquet as pq
 import pyarrow as pa
 import structlog
 import shutil
+import traceback
 
 log = structlog.get_logger()
 
 class DatabaseDiscovery:
     def __init__(self, root):
+        self.root = root
         self.root = root
         self.current_database_name = None
         self.current_database = None
@@ -49,9 +51,7 @@ class DatabaseDiscovery:
             self.current_database = DatabaseContents()
             self.discover_schemas()
             self.library.databases_by_name[self.current_database_name] = self.current_database
-        log.info("Discovery stats:")
-        for k, v in discovery_stats.items():
-            log.info(f" {k}: {v}s")
+        log.info("Discovery stats", **discovery_stats)
 
     def check_if_old(self):
         base_path = os.path.join(self.root, self.current_database_name)
@@ -155,7 +155,11 @@ class DatabaseDiscovery:
         table_info.update_table_schema(self.current_table_schema)
         table_info.alter_table_files(self.current_table_files, [])
         self.current_schema.tables_by_name[self.current_table_name] = table_info
-        print(f"discovered a legacy {self.current_database_name}.{self.current_schema_name}.{self.current_table_name} in {time.time() - start} seconds")
+        log.info("Discovered legacy table",
+                 database=self.current_database_name,
+                 schema=self.current_schema_name,
+                 table=self.current_table_name,
+                 discovery_time=time.time() - start)
 
     def discover_legacy_table(self):
         table_path = os.path.join(self.root, self.current_database_name, self.current_schema_name, self.current_table_name)
@@ -187,7 +191,10 @@ class DatabaseDiscovery:
 
             return schema
         except Exception as e:
-            print(f"Error parsing schema for file {file_path}: {str(e)}")
+            log.error("Error parsing schema",
+                      file_path=file_path,
+                      error=str(e),
+                      traceback=traceback.format_exc())
             return None
 
     def parse_metadata(self, metadata):
