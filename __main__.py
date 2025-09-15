@@ -4,7 +4,9 @@ from contextlib import asynccontextmanager
 import duckdb
 from dotenv import load_dotenv
 
+import airport.configuraiton
 import services.writer
+from airport.configuraiton import Config, LayerConfig, LayerType
 
 load_dotenv()
 
@@ -151,7 +153,17 @@ async def start_background_tasks():
 def run_airport_server():
     logger.info("Airport server start")
     server_host = "127.0.0.1" if not settings.flightsql.enable else "0.0.0.0"
-    writer_server.run(f"grpc://{server_host}:{settings.flightsql.port}", settings.gigapi.root)
+
+    lc = []
+    for c in settings.gigapi.layers:
+        ltype = LayerType.FILE if c.type == "fs" else LayerType.S3
+        lc.append(LayerConfig(name=c.name, type=ltype, is_global=c.is_global, url=c.url, ttl_sec=c.ttl))
+    airport_conf = Config(
+        root_folder=settings.gigapi.root,
+        location=f"grpc://{server_host}:{settings.flightsql.port}",
+        layer_configuration=lc
+    )
+    writer_server.start_server(airport_conf)
     logger.info("Airport server stop")
 
 async def run_server():

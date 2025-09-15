@@ -8,6 +8,7 @@ from .constants import event_timestamp_column, default_schema_name
 from .flight_descriptor import FlightDescriptorParts, ObjectTypeName
 from .utils import CaseInsensitiveDict
 from enum import Enum
+from .configuraiton import config
 
 
 def encode_custom(obj):
@@ -73,6 +74,16 @@ def encode_custom(obj):
             "__custom__": "DeletePlans",
             "data": obj.__getstate__()
         }
+    elif isinstance(obj, MovePlans):
+        return {
+            "__custom__": "MovePlans",
+            "data": obj.__getstate__()
+        }
+    elif isinstance(obj, MovePlan):
+        return {
+            "__custom__": "MovePlan",
+            "data": obj.__getstate__()
+        }
     return obj
 
 def decode_custom(obj):
@@ -109,8 +120,14 @@ def decode_custom(obj):
             return DeletePlan(**obj["data"])
         elif class_name == "DeletePlans":
             return DeletePlans(**obj["data"])
+        elif class_name == "MovePlans":
+            if "delete_files" in obj["data"]:
+                obj["data"]["move_files"] = obj["data"]["delete_files"]
+                del obj["data"]["delete_files"]
+            return MovePlans(**obj["data"])
+        elif class_name == "MovePlan":
+            return MovePlan(**obj["data"])
     return obj
-
 
 
 @dataclass
@@ -121,6 +138,8 @@ class TableFile:
 
     event_timestamp_column: str = event_timestamp_column
     size_bytes: int = field(default=0)
+    file_created_at: int = field(default_factory=lambda: int(time.time()))
+    layer_name: str = field(default_factory=lambda: config().layer_configuration[0].name)
     def __getstate__(self):
         return {
             "filename": self.filename,
@@ -128,6 +147,8 @@ class TableFile:
             "event_timestamp_max": self.event_timestamp_max,
             "event_timestamp_column": self.event_timestamp_column,
             "size_bytes": self.size_bytes,
+            "file_created_at": self.file_created_at,
+            "layer_name": self.layer_name
         }
 
     def __setstate__(self, state):
@@ -136,6 +157,8 @@ class TableFile:
         self.event_timestamp_max = state["event_timestamp_max"]
         self.event_timestamp_column = state["event_timestamp_column"]
         self.size_bytes = state["size_bytes"]
+        self.file_created_at = state["file_created_at"] if "file_created_at" in state else time.time()
+        self.layer_name = state["layer_name"] if "layer_name" in state else config().layer_configuration[0].name
 
 
 class MetaStore:
@@ -192,6 +215,23 @@ class DeletePlans:
     def __getstate__(self):
         return {
             "delete_files": self.delete_files
+        }
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+
+@dataclass
+class MovePlan:
+    file: TableFile
+    layer_from_name: str
+    layer_to_name: str
+    created_at: float = field(default_factory=time.time)
+
+@dataclass
+class MovePlans:
+    move_files: list[MovePlan] = field(default_factory=list)
+    def __getstate__(self):
+        return {
+            "move_files": self.move_files
         }
     def __setstate__(self, state):
         self.__dict__.update(state)

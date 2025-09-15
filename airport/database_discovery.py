@@ -19,6 +19,7 @@ import time
 from .delete_planner import DeletePlanner
 from .merge_planner import MergePlanner
 from .metadata_file_store import MetadataFileStore, discovery_stats
+from .move_planner import MovePlanner
 from .table import DatabaseLibrary, DatabaseContents, TableInfo, TableFile, SchemaCollection
 import pyarrow.parquet as pq
 import pyarrow as pa
@@ -137,12 +138,17 @@ class DatabaseDiscovery:
                                      self.current_database_name,
                                      self.current_schema_name,
                                      self.current_table_name)
+        move_planner = MovePlanner(self.root,
+                                   self.current_database_name,
+                                   self.current_schema_name,
+                                   self.current_table_name)
         table_info = TableInfo(
             table_schema=None,
             contents=[],
             table_versions=[],
             delete_planner=delete_planner,
-            merge_planner=merge_planner)
+            merge_planner=merge_planner,
+            move_planner=move_planner)
         meta_store=MetadataFileStore(
             self.root,
             self.current_database_name,
@@ -150,7 +156,8 @@ class DatabaseDiscovery:
             self.current_table_name,
             table_info,
             merge_planner,
-            delete_planner)
+            delete_planner,
+            move_planner)
         table_info.meta_store = meta_store
         table_info.update_table_schema(self.current_table_schema)
         table_info.alter_table_files(self.current_table_files, [])

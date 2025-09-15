@@ -36,14 +36,18 @@ from .constants import event_timestamp_column, ingest_timestamp_column, default_
 from .delete_orchestrator import DeleteOrchestrator
 from .delete_planner import DeletePlanner
 from .flight_descriptor import FlightDescriptorParts, ObjectTypeName
+from .fs_operator_smart import FsOperatorSmart
 from .merge_orchestrator import MergeOrchestrator
 from .merge_planner import MergePlanner
 from .metadata_file_store import MetadataFileStore
+from .move_orchestrator import MoveOrchestrator
+from .move_planner import MovePlanner
 from .utils import CaseInsensitiveDict
 from .model import TableFile
 from .table import TableInfo, SchemaCollection, DatabaseContents, DatabaseLibrary
 from .database_discovery import discover_databases
 from .bunch_of_parquets import BunchOfParquets
+from .configuraiton import Config, LayerType, config, set_config
 from structlog._log_levels import NAME_TO_LEVEL
 
 
@@ -125,17 +129,22 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
     def __init__(
         self,
         *,
-        location: str | None,
         auth_manager: auth_manager.AuthManager[auth.Account, auth.AccountToken],
         **kwargs: dict[str, Any],
     ) -> None:
+        conf = config()
+        if not conf:
+            raise ValueError("Configuration must be provided.")
         self.service_name = "gigapipe_writer"
         self._auth_manager = auth_manager
-        if "base_path" in kwargs:
-            self.base_path = kwargs["base_path"]
-            kwargs.pop("base_path")
-        else:
-            self.base_path = "data"
+        self.base_path = conf.root_folder
+        self.layers = conf.layer_configuration
+        if len(conf.layer_configuration) > 0:
+            if conf.layer_configuration[0].type != LayerType.FILE:
+                raise ValueError("Layer configuration must start with a FILE layer.")
+            self.base_path = self.parse_fs_url(conf.layer_configuration[0].url)
+        elif not conf.root_folder:
+            self.base_path = "./data"
 
         # token, database name, schema, table_name
 
@@ -148,20 +157,25 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
 
         merge_orchestrator = MergeOrchestrator()
         delete_orchestrator = DeleteOrchestrator()
+        move_orchestrator = MoveOrchestrator()
         for schemas in contents.databases_by_name.values():
             for schema in schemas.schemas_by_name.values():
                 for table_info in schema.tables_by_name.values():
                     if table_info.merge_planner is not None:
                         merge_orchestrator.add_planner(table_info)
                         delete_orchestrator.add_planner(table_info.delete_planner)
+                        move_orchestrator.add_planner(table_info)
 
-        super().__init__(location=location, **kwargs)
+        super().__init__(location=conf.location, **kwargs)
         self.contents = contents
         self.merge_orchestrator = merge_orchestrator
         self.delete_orchestrator = delete_orchestrator
+        self.move_orchestrator = move_orchestrator
 
-
-
+    def parse_fs_url(self, url: str) -> str:
+        if not url.startswith("file://"):
+            raise ValueError(f"Invalid file URL: {url}")
+        return url[7:]
 
     def action_list_schemas(
         self,
@@ -327,6 +341,8 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
 
         schema.by_name("table", parameters.name)
 
+        #TODO: support multilayer
+
         table_path = os.path.join(self.base_path, parameters.catalog_name, parameters.schema_name, parameters.name)
         if os.path.exists(table_path):
             shutil.rmtree(table_path)
@@ -352,7 +368,7 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
 
         del database.schemas_by_name[parameters.name]
         database.version += 1
-
+        #TODO: support multilayer
         if os.path.exists(os.path.join(self.base_path, parameters.catalog_name, parameters.name)):
             shutil.rmtree(os.path.join(self.base_path, parameters.catalog_name, parameters.name))
 
@@ -380,13 +396,16 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
 
         assert event_timestamp_column not in actual_schema.names
         actual_schema = actual_schema.append(pa.field(event_timestamp_column, pa.timestamp("ns")))
-
+        #TODO: support multilayer
         table_info = TableInfo(
             table_schema=actual_schema,
             merge_planner=MergePlanner(
                 self.base_path, parameters.catalog_name, parameters.schema_name, parameters.table_name
             ),
             delete_planner=DeletePlanner(
+                self.base_path, parameters.catalog_name, parameters.schema_name, parameters.table_name
+            ),
+            move_planner=MovePlanner(
                 self.base_path, parameters.catalog_name, parameters.schema_name, parameters.table_name
             ))
         os.makedirs(os.path.join(self.base_path, parameters.catalog_name, parameters.schema_name,
@@ -401,6 +420,7 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
 
         self.merge_orchestrator.add_planner(table_info)
         self.delete_orchestrator.add_planner(table_info.delete_planner)
+        self.move_orchestrator.add_planner(table_info)
 
         return table_info.flight_info(
             name=parameters.table_name,
@@ -511,7 +531,14 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
                     jbop.write_chunk(hour_dt, table_info.table_schema, hour_chunk)
                 if return_chunks:
                     writer.write_table(new_rows)
-            table_files = [f.table_file for f in jbop.parquet_files.values()]
+            table_files = []
+            for f in jbop.parquet_files.values():
+                tf = f.table_file
+                tf.size_bytes = FsOperatorSmart(config().layer_configuration[0].url).get_size(
+                    os.path.join(descriptor_parts.catalog_name,
+                                 descriptor_parts.schema_name,
+                                 descriptor_parts.name, tf.filename))
+                table_files.append(tf)
         # Update the metadata
         table_info.alter_table_files(table_files, [])
         return change_count
@@ -687,6 +714,14 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
             return flight.RecordBatchStream(table)
         raise flight.FlightServerError(f"Unsupported descriptor path: {ticket_data.descriptor.path}")
 
+    def filename(self, database: str, schema: str, table: str, file: TableFile):
+        layer = [x for x in config().layer_configuration if x.name == file.layer_name]
+        if len(layer) == 0:
+            raise ValueError(f"Layer not found: {file.layer_name}")
+        if layer[0].type == LayerType.FILE:
+            return os.path.join(layer[0].url[7:], database, schema, table, file.filename)
+        raise ValueError(f"Unsupported layer type: {layer[0].type}")
+
     def action_endpoints(
         self,
         *,
@@ -705,20 +740,26 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
         library = self.contents
         database = library.by_name(descriptor_parts.catalog_name)
         schema = database.by_name(descriptor_parts.schema_name)
-        filename = lambda x: x if x.startswith("/") else os.path.join(self.base_path,
-                                                                      descriptor_parts.catalog_name,
-                                                                      descriptor_parts.schema_name,
-                                                                      descriptor_parts.name,
-                                                                      x)
+        # TODO: support multilayer
+        def filename(x: TableFile):
+            return self.filename(
+                descriptor_parts.catalog_name,
+                descriptor_parts.schema_name,
+                descriptor_parts.name,
+                x)
 
         if descriptor_parts.type == "table":
             table_info = schema.by_name("table", descriptor_parts.name)
+            layers = {}
+            for f in table_info.contents:
+                layers[f.layer_name] = layers[f.layer_name] + 1 if f.layer_name in layers else 1
+            log.info("Files by layer", **layers)
 
             if parameters.parameters.json_filters is not None:
                 planner = scan_planner.Planner(
                     [
                         (
-                            filename(i.filename),
+                            filename(i),
                             {
                                 f"{i.event_timestamp_column}": scan_planner.RangeFieldInfo(
                                     min_value=i.event_timestamp_min,
@@ -739,7 +780,7 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
                     )
                 )
                 if filter_sql_where_clause == "" or filter_sql_where_clause is None:
-                    files_to_scan = [filename(i.filename) for i in table_info.contents]
+                    files_to_scan = [filename(i) for i in table_info.contents]
                 else:
                     filter_expression = sqlglot.parse_one(
                         f"select * from data where {filter_sql_where_clause}", dialect="duckdb"
@@ -855,6 +896,26 @@ def run(location: str, base_path: str) -> None:
         location=location,
         auth_manager=auth_manager,
         base_path=base_path
+    )
+    server.serve()
+
+def start_server(conf: Config) -> None:
+    global server
+    log.info("Starting server", location=conf.location)
+    set_config(conf)
+
+    auth_manager = auth_manager_naive.AuthManagerNaive[auth.Account, auth.AccountToken](
+        account_type=auth.Account,
+        token_type=auth.AccountToken,
+        allow_anonymous_access=False,
+    )
+
+    server = GigapipeWriterArrowFlightServer(
+        middleware={
+            "headers": base_middleware.SaveHeadersMiddlewareFactory(),
+            "auth": base_middleware.AuthManagerMiddlewareFactory(auth_manager=auth_manager),
+        },
+        auth_manager=auth_manager
     )
     server.serve()
 

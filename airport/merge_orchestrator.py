@@ -12,6 +12,7 @@ from .model import MergePlan, MergePlanState, TableFile
 import pyarrow.compute as pc
 import threading
 import time
+from .configuraiton import config
 
 from .table import TableInfo
 
@@ -48,8 +49,27 @@ class MergeOrchestrator:
                 t.merge_planner.cleanup()
             self.last_merge_cleanup = time.time()
         self.merge_iteration()
+        self.move_stale()
         self.timer = None
         self.start_timer()
+
+    def move_stale(self):
+        log.info("Moving stale merge plans")
+        if len(config().layer_configuration) <= 1:
+            return
+        moved = 0
+        for t in self.tables:
+            stale_merges = t.merge_planner.get_stale_merge_plans(config().layer_configuration[0].ttl_sec)
+            for m in stale_merges:
+                for f in m.from_table_files:
+                    t.move_planner.add_move_plan(
+                        layer_from_name=config().layer_configuration[0].name,
+                        layer_to_name=config().layer_configuration[1].name,
+                        f=f,
+                    )
+                t.merge_planner.rm_merge_plan(m)
+                moved += 1
+        log.info("Moved stale merge plans", move_count=moved)
 
     def merge_iteration(self):
         self.conn = duckdb.connect()
@@ -82,12 +102,14 @@ class MergeOrchestrator:
             to_file_abs = os.path.join(m.base, m.database, m.schema, m.table, m.merge_plan.to_file_path)
             event_timestamp_min = pc.min([f.event_timestamp_min for f in m.merge_plan.from_table_files])
             event_timestamp_max = pc.max([f.event_timestamp_max for f in m.merge_plan.from_table_files])
+            created_at = min([f.file_created_at for f in m.merge_plan.from_table_files])
             add_file = TableFile(
                 # TODO: fix the absolute paths
                 filename=m.merge_plan.to_file_path,
                 event_timestamp_min=event_timestamp_min,
                 event_timestamp_max=event_timestamp_max,
-                size_bytes = fsm.get_file_size(to_file_abs)
+                size_bytes = fsm.get_file_size(to_file_abs),
+                file_created_at=created_at,
             )
             m.table_info.alter_table_files([add_file], m.merge_plan.from_table_files)
         except Exception as e:

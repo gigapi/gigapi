@@ -104,3 +104,4 @@ zstandard==0.23.0
 line-protocol-parser==1.1.1
 assertpy==1.1
 objgraph==3.6.2
+attrs==25.3.0

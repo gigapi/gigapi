@@ -4,6 +4,22 @@ from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional, List
 
+class GigapiLayerConfiguration(BaseSettings):
+    name: str = Field("", description="Name of the layer")
+    type: str = Field("", description="Type of layer (fs, s3)")
+    is_global: bool = Field(False, description="Is the layer global")
+    url: str = Field("", description="URL for the layer")
+    ttl: int = Field(0, description="TTL for the layer in seconds")
+
+def get_gigapi_layer_configuration(id: int) -> GigapiLayerConfiguration:
+    class GigapiDynamicLayerConfiguration(GigapiLayerConfiguration):
+        class Config:
+            env_prefix = f"GIGAPI_LAYER_{id}_"
+            env_nested_delimiter = ""
+            extra = "allow"
+    layer = GigapiDynamicLayerConfiguration()
+    return layer
+
 class MetadataConfiguration(BaseSettings):
     type: str = Field("ducklake", description="Type of metadata storage (json or redis)")
     url: str = Field("", description="Redis URL for metadata storage")
@@ -45,6 +61,7 @@ class GigapiConfiguration(BaseSettings):
     ui: bool = Field(True, description="Enable UI for querier")
     mode: str = Field("aio", description="Execution mode (readonly, writeonly, compaction, aio)")
     metadata: MetadataConfiguration = Field(default_factory=MetadataConfiguration)
+    layers: List[GigapiLayerConfiguration] = Field(default_factory=list)
     class Config:
         env_prefix = "GIGAPI_"
         env_nested_delimiter = ""
@@ -65,6 +82,11 @@ settings.http = HTTPConfiguration()
 settings.flightsql = FlightSqlConfiguration()
 #settings.http.basic_auth = basic_auth
 settings.gigapi.metadata = MetadataConfiguration()
+i = 0
+while f"GIGAPI_LAYER_{i}_NAME" in os.environ:
+    layer = get_gigapi_layer_configuration(i)
+    settings.gigapi.layers.append(layer)
+    i += 1
 
 def postgres_connection_dict():
     res = {

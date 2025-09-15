@@ -10,6 +10,7 @@ import structlog
 
 from .model import encode_custom, decode_custom, MetaStore, TableFile, MergePlansByFolder
 from .delete_planner import DeletePlanner
+from .move_planner import MovePlanner
 from .table import TableInfo
 from duckdb import duckdb
 from .merge_planner import MergePlanner
@@ -41,6 +42,7 @@ discovery_stats = {
     'data_load': 0,
     'merge_load': 0,
     'delete_load': 0,
+    'move_load': 0
 }
 
 locks = {}
@@ -55,7 +57,8 @@ def cursor():
 
 class MetadataFileStore(MetaStore):
     def __init__(self, base: str, database: str, schema: str, table: str, table_info: TableInfo = None,
-                 merge_planner: MergePlanner = None, delete_planner: DeletePlanner = None):
+                 merge_planner: MergePlanner = None, delete_planner: DeletePlanner = None,
+                 move_planner: MovePlanner = None):
         self.base = base
         self.database = database
         self.table = table
@@ -76,6 +79,9 @@ class MetadataFileStore(MetaStore):
         self.delete_planner = delete_planner
         if self.delete_planner:
             self.delete_planner.on_change = self.on_delete_planner_change
+        self.move_planner = move_planner
+        if self.move_planner:
+            self.move_planner.on_change = self.on_move_planner_change
 
     def get_lock(self):
         if self.mdbname not in locks:
@@ -138,6 +144,9 @@ ON CONFLICT (filename) DO UPDATE SET file = excluded.file""", [file.filename, fi
         s1 = time.time()
         self.load_delete_planner(conn)
         discovery_stats['delete_load'] += time.time() - s1
+        s1 = time.time()
+        self.load_move_planner(conn)
+        discovery_stats['move_load'] += time.time() - s1
         self.table_info = TableInfo(
             table_schema=schema,
             contents=files,
@@ -145,6 +154,7 @@ ON CONFLICT (filename) DO UPDATE SET file = excluded.file""", [file.filename, fi
             meta_store=self,
             merge_planner=self.merge_planner,
             delete_planner=self.delete_planner,
+            move_planner=self.move_planner,
         )
         discovery_stats['data_load'] += time.time() - s
         return self.table_info
@@ -175,6 +185,16 @@ ON CONFLICT (filename) DO UPDATE SET file = excluded.file""", [file.filename, fi
             self.delete_planner = DeletePlanner(self.base, self.database, self.schema, self.table)
             self.delete_planner.on_change = self.on_delete_planner_change
 
+    def load_move_planner(self, conn):
+        move_plans = conn.query(f"SELECT plans FROM {self.mdbname}.merge_plans WHERE id = 3").fetchone()
+        if move_plans:
+            move_plans = msgpack.unpackb(move_plans[0], object_hook=decode_custom)
+            self.move_planner = MovePlanner(self.base, self.database, self.schema, self.table, move_plans)
+            self.move_planner.on_change = self.on_move_planner_change
+        else:
+            self.move_planner = MovePlanner(self.base, self.database, self.schema, self.table)
+            self.move_planner.on_change = self.on_move_planner_change
+
 
     def on_merge_planner_change(self, planner: MergePlanner):
         with cursor() as conn:
@@ -198,6 +218,19 @@ ON CONFLICT (id) DO UPDATE SET plans = excluded.plans
         conn.execute(f"""
 INSERT INTO {self.mdbname}.merge_plans (id, plans)
 VALUES (2,?)
+ON CONFLICT (id) DO UPDATE SET plans = excluded.plans
+""", [plan_blob])
+
+    def on_move_planner_change(self, planner: MovePlanner):
+        with self.get_lock():
+            with cursor() as conn:
+                self._on_move_planner_change(planner, conn)
+
+    def _on_move_planner_change(self, planner: MovePlanner, conn):
+        plan_blob = msgpack.packb(planner.move_plans, default=encode_custom)
+        conn.execute(f"""
+INSERT INTO {self.mdbname}.merge_plans (id, plans)
+VALUES (3,?)
 ON CONFLICT (id) DO UPDATE SET plans = excluded.plans
 """, [plan_blob])
 

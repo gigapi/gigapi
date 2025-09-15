@@ -55,6 +55,24 @@ class MergePlanner:
         if self.on_change is not None:
             self.on_change(self)
 
+    def get_stale_merge_plans(self, stale_threshold_s: int = 3600):
+        stale_merge_plans = []
+        for folder, merge_plans in self.merge_plans.merge_plans.items():
+            for merge_plan in merge_plans:
+                if merge_plan.state == MergePlanState.IDLE and \
+                    len(merge_plan.from_table_files) == 1 and \
+                    time.time() - merge_plan.updated_at > stale_threshold_s:
+                    stale_merge_plans.append(merge_plan)
+        return stale_merge_plans
+
+    def rm_merge_plan(self, merge_plan: MergePlan):
+        filename = self.normalize_filename(merge_plan.from_table_files[0].filename)
+        folder = os.path.dirname(filename)
+        self.merge_plans.merge_plans[folder] = [x for x in self.merge_plans.merge_plans[folder]
+                                                if x.to_file_path!= merge_plan.to_file_path]
+        if self.on_change is not None:
+            self.on_change(self)
+
     def get_merge_plan(self):
         for folder, merge_plans in self.merge_plans.merge_plans.items():
             for merge_plan in merge_plans:

@@ -10,6 +10,7 @@ from .model import TableFile
 import structlog
 import sys
 import traceback
+from .configuraiton import config
 
 log = structlog.get_logger()
 
@@ -48,6 +49,7 @@ class BunchOfParquets:
                 filename=path,
                 event_timestamp_min=None,
                 event_timestamp_max=None,
+                layer_name=config().layer_configuration[0].name
             ),
             pq.ParquetWriter(
                 abs_path,
