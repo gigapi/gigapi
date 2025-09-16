@@ -1,14 +1,18 @@
+import os.path
 from typing import BinaryIO, List
 
 from .configuraiton import LayerType
 from .fs_operator_local import FSOperatorLocal
 from .fs_operator_s3 import FSOperatorS3
 from airport.fs_operator import FsOperator
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qsl
+from .utils import LayerUrlHelper
+
 
 class FsOperatorSmart(FsOperator):
     def __init__(self, url: str):
         self.fs_operator = self._init(url)
+        self.url = url
 
     def _init(self, url: str):
         if url.startswith("file://"):
@@ -20,45 +24,21 @@ class FsOperatorSmart(FsOperator):
     def _init_local(self, url: str):
         if not url.startswith("file://"):
             raise ValueError(f"Invalid file URL: {url}")
-        return FSOperatorLocal(url[7:])
+        return FSOperatorLocal(os.path.sep.join(LayerUrlHelper(url).prefix))
 
 
 
     def _init_s3(self, url: str):
-        if not url.startswith("s3://"):
-            raise ValueError(f"Invalid S3 URL: {url}")
-
-        parsed_url = urlparse(url)
-
-        # Extract username and password
-        if '@' in parsed_url.netloc:
-            auth, host_port = parsed_url.netloc.split('@', 1)
-            username, password = auth.split(':', 1)
-        else:
-            host_port = parsed_url.netloc
-            username = password = None
-
-        # Extract hostname and port
-        if ':' in host_port:
-            hostname, port = host_port.split(':', 1)
-            port = int(port)
-        else:
-            hostname = host_port
-            port = 443  # Default HTTPS port
-
-        # Extract bucket name and prefix
-        path_parts = parsed_url.path.strip('/').split('/', 1)
-        bucket_name = path_parts[0]
-        prefix = path_parts[1] if len(path_parts) > 1 else ''
+        h = LayerUrlHelper(url)
         return FSOperatorS3(
-            hostname=hostname,
-            port=port,
-            username=username,
-            password=password,
-            bucket_name=bucket_name,
-            prefix=prefix
+            hostname=h.hostname,
+            port=h.port,
+            username=h.username,
+            password=h.password,
+            bucket_name=h.bucket_name,
+            prefix="/".join(h.prefix),
+            use_ssl=h.use_ssl,
         )
-
 
     def rmrf(self, path: str):
         return self.fs_operator.rmrf(path)
@@ -70,10 +50,10 @@ class FsOperatorSmart(FsOperator):
         return self.fs_operator.copy_internal(src_path, dst_path)
 
     def copy_external(self, src_path: str, dst_url: str) -> None:
-        path_parts = dst_url.rstrip('/').split('/')
-        _dst_url = '/'.join(path_parts[:-1])
-        dst_filename = path_parts[-1]
-        to_op = self._init(_dst_url)
+        h = LayerUrlHelper(dst_url)
+        dst_filename = h.prefix[-1]
+        h.set_prefix(h.prefix[:-1])
+        to_op = self._init(h.string())
         with self.fs_operator.open_file(src_path) as f:
             to_op.create_file(dst_filename, f)
 

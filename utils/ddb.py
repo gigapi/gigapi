@@ -9,6 +9,8 @@ from fsspec.implementations import memory
 import asyncio
 import functools
 
+from utils.url_helper import LayerUrlHelper
+
 memfs = memory.MemoryFileSystem()
 
 class AsyncDuckDBConnection:
@@ -66,6 +68,7 @@ def connect_airport(conn_str: str = None) -> Tuple[AsyncDuckDBConnection, Callab
             _conn.execute(f"""
 CREATE SECRET airport_testing (type airport, auth_token 'example_token', scope '{airport_host}');
 """)
+            init_s3(_conn)
             query_result: DuckDBPyRelation = _conn.query(f"SELECT name from airport_databases('{airport_host}')")
             databases = query_result.fetchall()
             if len(databases) == 0:
@@ -93,6 +96,23 @@ CREATE SECRET airport_testing (type airport, auth_token 'example_token', scope '
 
     except Exception as e:
         raise Exception(f"Failed to connect to DuckDB/Ducklake: {str(e)}")
+
+def init_s3(conn: DuckDBPyConnection):
+    for l in settings.gigapi.layers:
+        if l.type != "s3":
+            continue
+        h = LayerUrlHelper(l.url)
+        use_ssl = "true" if h.use_ssl else "false"
+        conn.execute(f"""
+CREATE OR REPLACE SECRET secret (
+    TYPE S3,
+    KEY_ID '{h.username}',
+    SECRET '{h.password}',
+    ENDPOINT '{h.hostname}:{h.port}',
+    USE_SSL {use_ssl},
+    URL_STYLE path,
+    SCOPE 's3://{h.bucket_name}'
+);""")
 
 @asynccontextmanager
 async def async_ducklake_connection(conn_str: str = None):

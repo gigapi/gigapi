@@ -14,6 +14,7 @@ from .move_planner import MovePlanner
 from .table import TableInfo
 from duckdb import duckdb
 from .merge_planner import MergePlanner
+from .configuraiton import config
 
 log = structlog.get_logger()
 
@@ -115,11 +116,15 @@ ON CONFLICT (id) DO UPDATE SET schema = excluded.schema
     def _on_files_update(self, files_added: list[TableFile], files_removed: list[TableFile], conn):
         for file in files_added:
             fileb = msgpack.packb(file, default=encode_custom)
+            filename = ("" if file.layer_name == config().layer_configuration[0].name else f"{file.layer_name}:") + \
+                file.filename
             conn.execute(f"""INSERT INTO {self.mdbname}.files (filename, file) 
 VALUES ($1, $2)
-ON CONFLICT (filename) DO UPDATE SET file = excluded.file""", [file.filename, fileb])
+ON CONFLICT (filename) DO UPDATE SET file = excluded.file""", [filename, fileb])
         for file in files_removed:
-            conn.execute(f"DELETE FROM {self.mdbname}.files WHERE filename = $1", [file.filename])
+            filename = ("" if file.layer_name == config().layer_configuration[0].name else f"{file.layer_name}:") + \
+                       file.filename
+            conn.execute(f"DELETE FROM {self.mdbname}.files WHERE filename = $1", [filename])
 
     def load(self):
         with self.get_lock():

@@ -5,7 +5,6 @@ import pyarrow.flight as flight
 import query_farm_flight_server.flight_inventory as flight_inventory
 import structlog
 
-from config import layer
 from .constants import default_schema_name
 from .delete_planner import DeletePlanner
 from .flight_descriptor import FlightDescriptorParts, ObjectTypeName
@@ -53,17 +52,9 @@ class TableInfo:
                 self.merge_planner.add_file(file)
             elif layer[0].ttl_sec > 0:
                 self.move_planner.add_move_plan(file, layer[0].name, next_layer_name)
-        layers = {}
-        for f in self.contents:
-            layers[f.layer_name] = layers[f.layer_name] + 1 if f.layer_name in layers else 1
-        log.debug("ALTER Files by layer", **layers)
         for file in removed:
             self.contents = [f for f in self.contents if f.filename!= file.filename or f.layer_name != file.layer_name]
             self.delete_planner.add_delete_plan(file.filename)
-        layers = {}
-        for f in self.contents:
-            layers[f.layer_name] = layers[f.layer_name] + 1 if f.layer_name in layers else 1
-        log.debug("ALTER Files by layer", **layers)
 
     def version(self, version: int | None = None) -> pa.Table:
         """

@@ -4,6 +4,9 @@ import uuid
 from .constants import max_parquet_size
 from .model import MergePlan, TableFile, MergePlansByFolder, MergePlanState
 from typing import Optional, Callable
+import structlog
+
+log = structlog.get_logger()
 
 class MergePlanWrapper:
     def __init__(self, merge_plan: MergePlan) -> None:
@@ -52,6 +55,7 @@ class MergePlanner:
             self.merge_plans.merge_plans[folder][-1].from_table_files.append(file)
             self.merge_plans.merge_plans[folder][-1].from_file_paths.append(filename)
             self.merge_plans.merge_plans[folder][-1].size_bytes += file.size_bytes
+            self.merge_plans.merge_plans[folder][-1].updated_at = time.time()
         if self.on_change is not None:
             self.on_change(self)
 

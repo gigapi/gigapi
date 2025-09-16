@@ -17,6 +17,8 @@ class MovePlanner:
         self.move_plans = MovePlans(move_files=[x for x in mp.values()]) # move_plans if move_plans is not None else MovePlans()
 
     def add_move_plan(self, f: TableFile, layer_from_name: str, layer_to_name: str) -> None:
+        if not f.filename.startswith("data"):
+            raise ValueError("File must start with 'data'")
         if len([x for x in self.move_plans.move_files
                 if x.file.filename == f.filename and x.layer_from_name == layer_from_name]) > 0:
             return

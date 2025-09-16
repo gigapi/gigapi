@@ -42,7 +42,7 @@ from .merge_planner import MergePlanner
 from .metadata_file_store import MetadataFileStore
 from .move_orchestrator import MoveOrchestrator
 from .move_planner import MovePlanner
-from .utils import CaseInsensitiveDict
+from .utils import CaseInsensitiveDict, LayerUrlHelper
 from .model import TableFile
 from .table import TableInfo, SchemaCollection, DatabaseContents, DatabaseLibrary
 from .database_discovery import discover_databases
@@ -397,6 +397,7 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
         assert event_timestamp_column not in actual_schema.names
         actual_schema = actual_schema.append(pa.field(event_timestamp_column, pa.timestamp("ns")))
         #TODO: support multilayer
+
         table_info = TableInfo(
             table_schema=actual_schema,
             merge_planner=MergePlanner(
@@ -410,8 +411,16 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
             ))
         os.makedirs(os.path.join(self.base_path, parameters.catalog_name, parameters.schema_name,
                                  parameters.table_name), exist_ok=True)
-        table_info.meta_store = MetadataFileStore(self.base_path,
-              parameters.catalog_name, parameters.schema_name, parameters.table_name, table_info)
+        table_info.meta_store = MetadataFileStore(
+            self.base_path,
+            parameters.catalog_name,
+            parameters.schema_name,
+            parameters.table_name,
+            table_info,
+            table_info.merge_planner,
+            table_info.delete_planner,
+            table_info.move_planner
+        )
         table_info.meta_store.on_schema_update()
 
         schema.tables_by_name[parameters.table_name] = table_info
@@ -720,6 +729,12 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
             raise ValueError(f"Layer not found: {file.layer_name}")
         if layer[0].type == LayerType.FILE:
             return os.path.join(layer[0].url[7:], database, schema, table, file.filename)
+        elif layer[0].type == LayerType.S3:
+            h = LayerUrlHelper(layer[0].url)
+            prefix = "/".join(h.prefix).lstrip("/")
+            if len(prefix) > 0:
+                prefix = f"/{prefix}"
+            return f"s3://{h.bucket_name}{prefix}/{database}/{schema}/{table}/{file.filename}"
         raise ValueError(f"Unsupported layer type: {layer[0].type}")
 
     def action_endpoints(
@@ -742,18 +757,10 @@ class GigapipeWriterArrowFlightServer(base_server.BasicFlightServer[auth.Account
         schema = database.by_name(descriptor_parts.schema_name)
         # TODO: support multilayer
         def filename(x: TableFile):
-            return self.filename(
-                descriptor_parts.catalog_name,
-                descriptor_parts.schema_name,
-                descriptor_parts.name,
-                x)
+            return self.filename(descriptor_parts.catalog_name, descriptor_parts.schema_name, descriptor_parts.name, x)
 
         if descriptor_parts.type == "table":
             table_info = schema.by_name("table", descriptor_parts.name)
-            layers = {}
-            for f in table_info.contents:
-                layers[f.layer_name] = layers[f.layer_name] + 1 if f.layer_name in layers else 1
-            log.info("Files by layer", **layers)
 
             if parameters.parameters.json_filters is not None:
                 planner = scan_planner.Planner(

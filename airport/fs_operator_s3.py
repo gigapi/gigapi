@@ -21,6 +21,7 @@ class FSOperatorS3(FsOperator):
             config=Config(signature_version='s3v4'),
             region_name='us-east-1'  # This can be any valid region for S3-compatible servers
         )
+        self.sep = "/"
 
     def _full_path(self, path: str) -> str:
         if path.startswith("/"):

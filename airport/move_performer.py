@@ -3,6 +3,7 @@ from .fs_operator_smart import FsOperatorSmart
 from typing import List
 import os
 import structlog
+from urllib.parse import urlparse, urlunparse
 
 log = structlog.get_logger()
 
@@ -21,8 +22,7 @@ class Mover:
         destination_url = self.join(self.layer_to.type, self.layer_to.url, path)
         frm = self.join(self.layer_from.type,  "", path).lstrip("/").lstrip(os.path.sep)
         if not operator.is_file(frm):
-            log.error("!!!!!!!!!! FUCKFUCKFUCK")
-            return
+            raise Exception(f"File not found: {frm}")
         operator.copy_external(
             self.join(self.layer_from.type,  "", path).lstrip("/").lstrip(os.path.sep),
             destination_url
@@ -32,5 +32,8 @@ class Mover:
         if layer_type == LayerType.FILE:
             return url + os.path.sep + os.path.sep.join(path)
         if layer_type == LayerType.S3:
-            return url + "/" + "/".join(path)
+            parsed_url = urlparse(url)
+            parsed_url = parsed_url._replace(path=parsed_url.path.rstrip('/') + '/' + '/'.join(path))
+            new_url = parsed_url.geturl()
+            return new_url
         raise ValueError("Unsupported file system")

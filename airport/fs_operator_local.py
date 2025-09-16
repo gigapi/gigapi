@@ -7,6 +7,7 @@ from .fs_operator import FsOperator
 class FSOperatorLocal(FsOperator):
     def __init__(self, base_path: str):
         self.base_path = base_path
+        self.sep = os.path.sep
 
     def rmrf(self, path: str) -> None:
         if not path.startswith("/"):
