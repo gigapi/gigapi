@@ -61,8 +61,7 @@ class BunchOfParquets:
     def write_chunk(self, hour: datetime.datetime, schema: pa.Schema, chunk: any):
         if schema is None:
             raise ValueError("Schema must be provided when creating a new ParquetWriter")
-        path = os.path.join(self.root, self.database, self.schema_name, self.table, "data",
-                            f"date={hour.strftime('%Y-%m-%d')}/hour={hour.strftime('%H')}", self.filename)
+        path = os.path.join("data", f"date={hour.strftime('%Y-%m-%d')}/hour={hour.strftime('%H')}", self.filename)
         w = self.get_parquet_writer(path, schema)
         w.writer.write_table(chunk)
         min_max = pc.min_max(chunk[event_timestamp_column])
