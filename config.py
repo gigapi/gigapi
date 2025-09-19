@@ -14,7 +14,7 @@ class GigapiLayerConfiguration(BaseSettings):
 def get_gigapi_layer_configuration(id: int) -> GigapiLayerConfiguration:
     class GigapiDynamicLayerConfiguration(GigapiLayerConfiguration):
         class Config:
-            env_prefix = f"GIGAPI_LAYER_{id}_"
+            env_prefix = f"GIGAPI_LAYERS_{id}_"
             env_nested_delimiter = ""
             extra = "allow"
     layer = GigapiDynamicLayerConfiguration()
@@ -83,7 +83,7 @@ settings.flightsql = FlightSqlConfiguration()
 #settings.http.basic_auth = basic_auth
 settings.gigapi.metadata = MetadataConfiguration()
 i = 0
-while f"GIGAPI_LAYER_{i}_NAME" in os.environ:
+while f"GIGAPI_LAYERS_{i}_NAME" in os.environ:
     layer = get_gigapi_layer_configuration(i)
     settings.gigapi.layers.append(layer)
     i += 1

@@ -61,11 +61,11 @@ services:
 | `FLIGHTSQL_PORT`           | Port to run FlightSQL server                                        | `8082`        | 🟢          |
 | `FLIGHTSQL_ENABLE`         | Enable FlightSQL server                                             | `true`        | 🟢          |
 | `LOGLEVEL`                 | Log level (debug, info, warn, error, fatal)                         | `"info"`      | 🟢          |
-| `GIGAPI_LAYER_X_NAME`      | X - layer index from 0. Layer unique name.                          |               | 🟠          |
-| `GIGAPI_LAYER_X_TYPE`      | `fs` for file system, `s3` for s3                                   |               | 🟠          |
-| `GIGAPI_LAYER_X_GLOBAL`    | `true` if all the cluster has an access to the layer                |               | 🟠          |
-| `GIGAPI_LAYER_X_URL`       | path or url to s3                                                   |               | 🟠          |
-| `GIGAPI_LAYER_X_TTL`       | timeout before send data to the next layer or drop it 0 for no drop | `0`           | 🟠          |
+| `GIGAPI_LAYERS_X_NAME`     | X - layer index from 0. Layer unique name.                          |               | 🟠          |
+| `GIGAPI_LAYERS_X_TYPE`     | `fs` for file system, `s3` for s3                                   |               | 🟠          |
+| `GIGAPI_LAYERS_X_GLOBAL`   | `true` if all the cluster has an access to the layer                |               | 🟠          |
+| `GIGAPI_LAYERS_X_URL`      | path or url to s3                                                   |               | 🟠          |
+| `GIGAPI_LAYERS_X_TTL`      | timeout before send data to the next layer or drop it 0 for no drop | `0`           | 🟠          |
 
 > You can override the defaults by setting these environment variables before starting the service.
 
