@@ -104,7 +104,7 @@ def init_s3(conn: DuckDBPyConnection):
         h = LayerUrlHelper(l.url)
         use_ssl = "true" if h.use_ssl else "false"
         conn.execute(f"""
-CREATE OR REPLACE SECRET secret (
+CREATE OR REPLACE SECRET {l.name}_secret (
     TYPE S3,
     KEY_ID '{h.username}',
     SECRET '{h.password}',

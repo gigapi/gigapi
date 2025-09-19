@@ -41,7 +41,7 @@ class BunchOfParquets:
         if path in self.parquet_files:
             return self.parquet_files[path]
 
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
 
         self.parquet_files[path] = ParquetWrapper(
             abs_path,

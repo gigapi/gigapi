@@ -208,6 +208,7 @@ class MergePlansByFolder:
 class DeletePlan:
     file_path: str
     created_at: float = field(default_factory=time.time)
+    layer_name: str = field(default_factory=lambda: config().layer_configuration[0].name)
 
 @dataclass
 class DeletePlans:

@@ -26,10 +26,10 @@ class FSOperatorS3(FsOperator):
     def _full_path(self, path: str) -> str:
         if path.startswith("/"):
             return path
-        return os.path.join(self.prefix, path)
+        return f"{self.prefix.rstrip("/")}/{path.lstrip("/")}"
 
     def rmrf(self, path: str):
-        full_path = self._full_path(path)
+        full_path = self._full_path(path).lstrip("/")
         objects_to_delete = self.s3.list_objects_v2(Bucket=self.bucket_name, Prefix=full_path)
         delete_keys = {'Objects': [{'Key': obj['Key']} for obj in objects_to_delete.get('Contents', [])]}
         if delete_keys['Objects']:

@@ -6,7 +6,7 @@ import duckdb
 import structlog
 
 from .constants import max_merge_processes
-from .merge_performer import FSMerger
+from .merge_performer import Merger
 from .merge_planner import MergePlanner
 from .model import MergePlan, MergePlanState, TableFile
 import pyarrow.compute as pc
@@ -59,16 +59,20 @@ class MergeOrchestrator:
             return
         moved = 0
         for t in self.tables:
-            stale_merges = t.merge_planner.get_stale_merge_plans(config().layer_configuration[0].ttl_sec)
-            for m in stale_merges:
-                for f in m.from_table_files:
-                    t.move_planner.add_move_plan(
-                        layer_from_name=config().layer_configuration[0].name,
-                        layer_to_name=config().layer_configuration[1].name,
-                        f=f,
-                    )
-                t.merge_planner.rm_merge_plan(m)
-                moved += 1
+            for l in config().layer_configuration:
+                l_idx = config().layer_configuration.index(l)
+                next_layer_name = config().layer_configuration[l_idx + 1].name \
+                    if l_idx + 1 < len(config().layer_configuration) else None
+                stale_merges = t.merge_planner.get_stale_merge_plans(l)
+                for m in stale_merges:
+                    for f in m.from_table_files:
+                        t.move_planner.add_move_plan(
+                            layer_from_name=config().layer_configuration[0].name,
+                            layer_to_name=next_layer_name,
+                            f=f,
+                        )
+                    t.merge_planner.rm_merge_plan(m)
+                    moved += 1
         log.info("Moved stale merge plans", move_count=moved)
 
     def merge_iteration(self):
@@ -96,20 +100,22 @@ class MergeOrchestrator:
     def execute_merge(self, i: int):
         try:
             m = self.current_merge_plans[i]
-            fsm = FSMerger(m.base, m.database, m.schema, m.table, self.conn)
+            fsm = Merger(m.database, m.schema, m.table, self.conn)
             fsm.do_merge(m.merge_plan)
+            layer = [c for c in config().layer_configuration if c.name == m.merge_plan.from_table_files[0].layer_name]
+            if len(layer) == 0:
+                raise ValueError(f"Layer not found: {m.merge_plan.from_table_files[0].layer_name}")
             m.merge_plan.state = MergePlanState.DONE
-            to_file_abs = os.path.join(m.base, m.database, m.schema, m.table, m.merge_plan.to_file_path)
             event_timestamp_min = pc.min([f.event_timestamp_min for f in m.merge_plan.from_table_files])
             event_timestamp_max = pc.max([f.event_timestamp_max for f in m.merge_plan.from_table_files])
             created_at = min([f.file_created_at for f in m.merge_plan.from_table_files])
             add_file = TableFile(
-                # TODO: fix the absolute paths
                 filename=m.merge_plan.to_file_path,
                 event_timestamp_min=event_timestamp_min,
                 event_timestamp_max=event_timestamp_max,
-                size_bytes = fsm.get_file_size(to_file_abs),
+                size_bytes = fsm.get_file_size(layer[0], m.merge_plan.to_file_path),
                 file_created_at=created_at,
+                layer_name=layer[0].name
             )
             m.table_info.alter_table_files([add_file], m.merge_plan.from_table_files)
         except Exception as e:

@@ -1,6 +1,9 @@
 import time
 from typing import Optional, Callable
 from .model import DeletePlans, DeletePlan
+import structlog
+
+log = structlog.get_logger()
 
 
 class DeletePlanner:
@@ -18,8 +21,11 @@ class DeletePlanner:
                 filename = filename[len(rm)+1:]
         return filename
 
-    def add_delete_plan(self, plan: str):
-        self.delete_plans.delete_files.append(DeletePlan(file_path=self.normalize_filename(plan)))
+    def add_delete_plan(self, plan: str, layer_name: str):
+        log.info(f"Adding delete plan: {plan} (layer: {layer_name})")
+        self.delete_plans.delete_files.append(DeletePlan(
+            file_path=self.normalize_filename(plan),
+            layer_name=layer_name))
         if self.on_change:
             self.on_change(self)
 
@@ -28,7 +34,8 @@ class DeletePlanner:
             return self.delete_plans.delete_files[0]
         return None
 
-    def remove_delete_plan(self, file_path: str):
-        self.delete_plans.delete_files = [p for p in self.delete_plans.delete_files if p.file_path != file_path]
+    def remove_delete_plan(self, plan: DeletePlan):
+        self.delete_plans.delete_files = [p for p in self.delete_plans.delete_files
+                                          if p.file_path != plan.file_path or p.layer_name != plan.layer_name]
         if self.on_change:
             self.on_change(self)

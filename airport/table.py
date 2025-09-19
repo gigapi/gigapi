@@ -40,6 +40,7 @@ class TableInfo:
     def alter_table_files(self, added: list[TableFile], removed: list[TableFile]) -> None:
         self.meta_store.on_files_update(added, removed)
         self.contents.extend(added)
+        log.info("Files registered for remove", files=removed)
         for file in added:
             layer = [x for x in config().layer_configuration if x.name == file.layer_name]
             if len(layer) == 0:
@@ -47,14 +48,14 @@ class TableInfo:
             layer_idx = config().layer_configuration.index(layer[0])
             next_layer_name = config().layer_configuration[layer_idx + 1].name \
                 if layer_idx + 1 < len(config().layer_configuration) else None
-            #TODO: remove layer idx after we add merge on s3
-            if (layer[0].ttl_sec + file.file_created_at > time.time() + 30 or layer[0].ttl_sec == 0) and layer_idx == 0:
+            if layer[0].ttl_sec + file.file_created_at > time.time() + 30 or layer[0].ttl_sec == 0:
                 self.merge_planner.add_file(file)
             elif layer[0].ttl_sec > 0:
                 self.move_planner.add_move_plan(file, layer[0].name, next_layer_name)
         for file in removed:
+            log.info("File planned to remove", files=file)
             self.contents = [f for f in self.contents if f.filename!= file.filename or f.layer_name != file.layer_name]
-            self.delete_planner.add_delete_plan(file.filename)
+            self.delete_planner.add_delete_plan(file.filename, file.layer_name)
 
     def version(self, version: int | None = None) -> pa.Table:
         """
