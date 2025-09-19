@@ -61,7 +61,7 @@ class GigapiConfiguration(BaseSettings):
     ui: bool = Field(True, description="Enable UI for querier")
     mode: str = Field("aio", description="Execution mode (readonly, writeonly, compaction, aio)")
     metadata: MetadataConfiguration = Field(default_factory=MetadataConfiguration)
-    layers: List[GigapiLayerConfiguration] = Field(default_factory=list)
+    layers: List[GigapiLayerConfiguration] = Field(alias="__layers", default_factory=list)
     class Config:
         env_prefix = "GIGAPI_"
         env_nested_delimiter = ""
