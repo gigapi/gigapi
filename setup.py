@@ -33,8 +33,17 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/gigapi/gigapi',
-    packages=find_packages(include=['*']),
-    py_modules=['__main__', 'config'],
+    packages=find_packages(),
+    py_modules=[],  # Remove this line since modules are now in packages
+    entry_points={
+        'console_scripts': [
+            'gigapi=gigapi.__main__:main',  # Update the entry point
+        ],
+    },
+    package_data={
+        'gigapi.views': ['ui.zip'],  # Update package data path
+        '': ['*.yaml', '*.yml', '*.json', '*.toml'],
+    },
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
@@ -84,16 +93,7 @@ setup(
             'botocore==1.39.4',
         ],
     },
-    entry_points={
-        'console_scripts': [
-            'gigapi=__main__:main',
-        ],
-    },
     include_package_data=True,
-    package_data={
-        'views': ['ui.zip'],
-        '': ['*.yaml', '*.yml', '*.json', '*.toml'],
-    },
     zip_safe=False,
     keywords='database, time-series, parquet, duckdb, fastapi, analytics',
     project_urls={
