@@ -33,7 +33,7 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/gigapi/gigapi',
-    packages=find_packages(exclude=['tests*', 'demo_data*', '_testdata*']),
+    packages=['services', 'utils', 'views'],
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
