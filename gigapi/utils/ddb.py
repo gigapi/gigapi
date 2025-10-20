@@ -101,7 +101,6 @@ def init_s3(conn: DuckDBPyConnection):
     for l in settings.gigapi.layers:
         if l.type != "s3":
             continue
-        print(f"Initializing S3 secrets for {settings.gigapi.metadata.name}")
         h = LayerUrlHelper(l.url)
         use_ssl = "true" if h.use_ssl else "false"
         print(f"""CREATE OR REPLACE SECRET {l.name}_secret (
