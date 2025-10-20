@@ -1,6 +1,6 @@
 from typing import Optional
 
-from services.kvstore import FileStore
+from gigapi.services.kvstore import FileStore
 from fastapi import APIRouter, Request, Query
 from fastapi.responses import JSONResponse, Response
 

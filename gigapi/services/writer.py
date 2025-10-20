@@ -1,7 +1,7 @@
 import json
 import asyncio
 from typing import List, Dict
-from utils.ddb import async_ducklake_connection, memfs, AsyncDuckDBConnection, get_airport_host
+from gigapi.utils.ddb import async_ducklake_connection, memfs, AsyncDuckDBConnection, get_airport_host
 import uuid
 from .points import parse_points
 import structlog

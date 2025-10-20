@@ -1,5 +1,5 @@
 from duckdb.duckdb import DuckDBPyRelation
-from utils.ddb import async_ducklake_connection, AsyncDuckDBConnection
+from gigapi.utils.ddb import async_ducklake_connection, AsyncDuckDBConnection
 
 async def query(request: str, database: str = None):
     if database:

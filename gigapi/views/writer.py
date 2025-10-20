@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Query
 from fastapi.responses import JSONResponse
-from services.writer import write_lineproto
+from gigapi.services.writer import write_lineproto
 
 router = APIRouter()
 # TODO: support

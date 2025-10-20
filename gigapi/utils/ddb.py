@@ -4,12 +4,12 @@ from contextlib import contextmanager, asynccontextmanager
 
 from duckdb.duckdb import DuckDBPyRelation, DuckDBPyConnection
 
-from config import settings
+from gigapi.config import settings
 from fsspec.implementations import memory
 import asyncio
 import functools
 
-from utils.url_helper import LayerUrlHelper
+from gigapi.utils.url_helper import LayerUrlHelper
 
 memfs = memory.MemoryFileSystem()
 

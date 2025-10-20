@@ -5,7 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Request, Query, Body
 from fastapi.responses import JSONResponse, Response, StreamingResponse
-from services.reader import query
+from gigapi.services.reader import query
 from pydantic import BaseModel, Field
 from datetime import datetime, date
 from asyncio import Lock

@@ -27,7 +27,7 @@ from services.kvstore import FileStore
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi import Depends, HTTPException, status
-from config import settings
+from gigapi.config import settings
 import logging
 
 def get_log_level():
