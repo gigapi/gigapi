@@ -4,9 +4,7 @@ from contextlib import asynccontextmanager
 import duckdb
 from dotenv import load_dotenv
 
-import airport.configuraiton
 import services.writer
-from airport.configuraiton import Config, LayerConfig, LayerType
 
 load_dotenv()
 
@@ -16,17 +14,13 @@ from views import reader, writer, middlewares, ui, kvstore
 import asyncio
 from config import settings
 from threading import Thread
-from airport import writer_server
-from airport import database_discovery
 from icecream import ic
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse, Response
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from airport.writer_server import GigapipeWriterArrowFlightServer
 import signal
 import sys
-from airport.metadata_file_store import MetadataFileStore
 import objgraph
 import time
 from services.kvstore import FileStore
@@ -140,7 +134,6 @@ shutdown_event = asyncio.Event()
 
 def signal_handler(signum, frame):
     logger.info("Received shutdown signal")
-    writer_server.shutdown()
 
 async def start_background_tasks():
     # Start the run function as a background task
@@ -149,31 +142,12 @@ async def start_background_tasks():
     f = FileStore(settings.gigapi.root)
     kvstore.kv_store = f
 
-
-def run_airport_server():
-    logger.info("Airport server start")
-    server_host = "127.0.0.1" if not settings.flightsql.enable else "0.0.0.0"
-
-    lc = []
-    for c in settings.gigapi.layers:
-        ltype = LayerType.FILE if c.type == "fs" else LayerType.S3
-        lc.append(LayerConfig(name=c.name, type=ltype, is_global=c.is_global, url=c.url, ttl_sec=c.ttl))
-    airport_conf = Config(
-        root_folder=settings.gigapi.root,
-        location=f"grpc://{server_host}:{settings.flightsql.port}",
-        layer_configuration=lc
-    )
-    writer_server.start_server(airport_conf)
-    logger.info("Airport server stop")
-
 async def run_server():
     config = uvicorn.Config("__main__:app", host=settings.http.host, port=settings.http.port, loop="asyncio")
     server = uvicorn.Server(config)
     await server.serve()
 
 def main():
-    t = Thread(target=run_airport_server)
-    t.start()
     asyncio.run(run_server())
 
 if __name__ == "__main__":
@@ -194,27 +168,6 @@ if __name__ == "__main__":
         schema_name = path_parts[-2]
         table_name = path_parts[-1]
 
-        # Initialize MetadataFileStore
-        m = MetadataFileStore(
-            base=base_path,
-            database=database_name,
-            schema=schema_name,
-            table=table_name
-        )
-        m.load()
-        logger.info("Table statistics:")
-        logger.info(f"Total files: {len(m.table_info.contents)}")
-        logger.info(f"Delete plans: {len(m.delete_planner.delete_plans.delete_files)}")
-        logger.info("Merge plans: ")
-        for folder, merge_plans in m.merge_planner.merge_plans.merge_plans.items():
-            for merge_plan in merge_plans:
-                logger.info(f"  Folder: {folder}")
-                logger.info(f"  State: {merge_plan.state}")
-                logger.info(f"  From files: {len(merge_plan.from_table_files)}")
-                logger.info(f"  To file: {merge_plan.to_file_path}")
-                logger.info(f"  Created at: {merge_plan.created_at}")
-                logger.info(f"  Updated at: {merge_plan.updated_at}")
-                logger.info("  ---")
     elif os.getenv("CMD") == "setup":
         ddb = duckdb.connect()
         ddb.execute("INSTALL airport FROM community;")

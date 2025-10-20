@@ -37,7 +37,8 @@ class BasicAuthConfiguration(BaseSettings):
         extra = "allow"
 
 class FlightSqlConfiguration(BaseSettings):
-    port: int = Field(8082, description="Port to run flightSQL server")
+    port: int = Field(8082, description="Port to connect to flightSQL server")
+    host: str = Field("127.0.0.1", description="Host to connect to flightSQL server")
     enable: bool = Field(True, description="Enable FlightSQL server")
     class Config:
         env_prefix = "FLIGHTSQL_"

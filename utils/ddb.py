@@ -44,7 +44,7 @@ def connect_duckdb(conn_str: str = None, temporary: bool = False) -> DuckDBPyCon
 
 
 def get_airport_host() -> str:
-    host = "127.0.0.1"
+    host = settings.flightsql.host
     port = settings.flightsql.port
     return f"grpc://{host}:{port}"
 
